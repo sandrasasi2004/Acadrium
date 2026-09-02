@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 180" width="100%" height="100%">
+  <!-- Icon (Mortarboard + Tech Nodes) -->
+  <g transform="translate(10, 10)">
+    <!-- Cap top -->
+    <polygon points="90,20 160,50 90,80 20,50" fill="#4F46E5" />
+    <polygon points="90,25 145,49 90,73 35,49" fill="#818CF8" opacity="0.8" />
+    
+    <!-- Cap bottom / base -->
+    <path d="M50,63 L50,85 C50,105 130,105 130,85 L130,63 L90,80 Z" fill="#4F46E5" />
+    <path d="M50,85 C50,95 130,95 130,85" fill="none" stroke="#312E81" stroke-width="2" />
+    
+    <!-- Tassel -->
+    <path d="M160,50 L170,85 L165,115" fill="none" stroke="#4F46E5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+    <circle cx="165" cy="118" r="5" fill="#4F46E5" />
+    
+    <!-- Digital / AI dots (Tech Node effect) -->
+    <circle cx="30" cy="90" r="4" fill="#6366F1" />
+    <circle cx="18" cy="108" r="3.5" fill="#818CF8" />
+    <circle cx="38" cy="115" r="4.5" fill="#4F46E5" />
+    <path d="M30,90 L18,108 M30,90 L38,115" stroke="#818CF8" stroke-width="1.5" stroke-dasharray="2 2" />
+
+    <!-- Open book underneath -->
+    <path d="M55,120 C70,110 90,115 90,122 C90,115 110,110 125,120 L125,140 C110,130 90,135 90,142 C90,135 70,130 55,140 Z" fill="#4F46E5" />
+    <path d="M90,122 L90,142" stroke="#EEF2FF" stroke-width="2" />
+  </g>
+
+  <!-- Typography -->
+  <text x="210" y="95" font-family="'Outfit', 'Inter', sans-serif" font-size="52" font-weight="900" fill="#1E1B4B" letter-spacing="1">Acadrium</text>
+  <text x="212" y="132" font-family="'Inter', sans-serif" font-size="14" font-weight="600" fill="#6366F1" letter-spacing="4.5">— LEARN. TEACH. ACHIEVE. —</text>
+</svg>
