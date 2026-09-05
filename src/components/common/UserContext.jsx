@@ -60,6 +60,18 @@ export function UserProvider({ children }) {
           const userObj = profileRes.data;
           setCurrentUser(userObj);
           setUserRole(userObj.role || 'student');
+          
+          // Restore global backend state for classrooms and resources
+          api.listClassrooms().then(res => {
+            if (isMounted && res.success && Array.isArray(res.data)) {
+              setClassrooms(res.data);
+            }
+          });
+          api.listResources().then(res => {
+            if (isMounted && res.success && Array.isArray(res.data)) {
+              setResources(res.data);
+            }
+          });
         } else {
           // Token expired or invalid -> logout session
           localStorage.removeItem('token');
@@ -250,31 +262,69 @@ export function UserProvider({ children }) {
     return { success: false, error: res.error };
   };
 
-  const addResource = async (classroomId, title, type, size, fileObj = null) => {
-    const classroomName = classrooms.find(c => c.id === classroomId)?.subject || 'General';
-    const payload = {
-      classroomId,
-      classroomName,
-      title,
-      type,
-      size,
-      uploadedBy: currentUser?.name || 'Faculty User',
-      fileObj
-    };
-
-    const res = await api.uploadResource(payload);
-    if (res.success && res.data) {
-      setResources(prev => [res.data, ...prev]);
-      showToast('Resource uploaded successfully!', 'success');
+  const loadResources = async (params = {}) => {
+    setIsLoading(true);
+    const res = await api.listResources(params);
+    setIsLoading(false);
+    if (res.success && Array.isArray(res.data)) {
+      setResources(res.data);
       return res.data;
+    } else {
+      setResources([]);
+      return [];
     }
-    showToast(res.error || 'Failed to upload resource', 'error');
-    return null;
   };
 
-  const deleteResource = (id) => {
-    setResources(prev => prev.filter(r => r.id !== id));
-    showToast('Resource deleted successfully', 'success');
+  const fetchClassroomResources = async (classroomId) => {
+    if (!classroomId) return [];
+    const res = await api.getClassroomResources(classroomId);
+    if (res.success && Array.isArray(res.data)) {
+      setResources(prev => {
+        const otherRes = prev.filter(r => String(r.classroom_id || r.classroomId) !== String(classroomId));
+        return [...otherRes, ...res.data];
+      });
+      return res.data;
+    }
+    return [];
+  };
+
+  const uploadResource = async (formData) => {
+    setIsLoading(true);
+    const res = await api.uploadResource(formData);
+    setIsLoading(false);
+    if (res.success && res.data) {
+      showToast('Resource uploaded successfully!', 'success');
+      await loadResources();
+      return { success: true, data: res.data };
+    }
+    const errorMsg = res.error || 'Failed to upload resource';
+    showToast(errorMsg, 'error');
+    return { success: false, error: errorMsg };
+  };
+
+  const addResource = async (formDataOrClassroomId, title, type, size, fileObj = null) => {
+    if (formDataOrClassroomId instanceof FormData) {
+      return await uploadResource(formDataOrClassroomId);
+    }
+    const formData = new FormData();
+    formData.append('classroom_id', formDataOrClassroomId);
+    formData.append('title', title);
+    if (fileObj) {
+      formData.append('file', fileObj);
+    }
+    return await uploadResource(formData);
+  };
+
+  const deleteResource = async (id) => {
+    const res = await api.deleteResource(id);
+    if (res.success) {
+      setResources(prev => prev.filter(r => r.id !== id));
+      showToast('Resource deleted successfully', 'success');
+      return { success: true };
+    }
+    const errorMsg = res.error || 'Failed to delete resource';
+    showToast(errorMsg, 'error');
+    return { success: false, error: errorMsg };
   };
 
   const addAnnouncement = async (classroomId, title, content) => {
@@ -411,8 +461,11 @@ export function UserProvider({ children }) {
       joinClassroom,
       leaveClassroom,
       deleteClassroom,
+      loadResources,
+      uploadResource,
       addResource,
       deleteResource,
+      fetchClassroomResources,
       addAnnouncement,
       deleteAnnouncement,
       sendAiMessage,

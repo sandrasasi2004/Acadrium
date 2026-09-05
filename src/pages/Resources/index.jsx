@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUser } from '../../components/common/UserContext';
-import { FileText, Search, Filter, Download, Trash2, Plus, Sparkles, CheckCircle2, Eye, AlertCircle } from 'lucide-react';
-import DocumentViewer from '../../components/common/DocumentViewer';
+import * as api from '../../services/api';
+import { FileText, Search, Filter, Download, Trash2, Plus, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function Resources() {
   const { 
@@ -11,11 +11,16 @@ export default function Resources() {
     isLoading,
     error,
     showToast,
-    addResource,
+    loadResources,
+    fetchClassrooms,
+    uploadResource,
     deleteResource
   } = useUser();
 
-  const [previewFile, setPreviewFile] = useState(null);
+  useEffect(() => {
+    loadResources();
+    fetchClassrooms();
+  }, []);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,18 +30,18 @@ export default function Resources() {
   // Modal State
   const [showAddResModal, setShowAddResModal] = useState(false);
   const [resTitle, setResTitle] = useState('');
-  const [resClassroomId, setResClassroomId] = useState(classrooms[0]?.id || 'general');
+  const [resTags, setResTags] = useState('');
+  const [resClassroomId, setResClassroomId] = useState(classrooms[0]?.id || '');
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState('');
   const [resDescription, setResDescription] = useState('');
 
-  const handleAddClick = () => {
-    showToast('Resource upload will be available in Phase 4.', 'info');
-  };
-
-  const handlePreviewClick = () => {
-    showToast('Document preview will be available in Phase 4.', 'info');
-  };
+  // Update default target classroom when classrooms array changes
+  useEffect(() => {
+    if (classrooms.length > 0 && !resClassroomId) {
+      setResClassroomId(classrooms[0].id);
+    }
+  }, [classrooms]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -53,45 +58,72 @@ export default function Resources() {
     const ext = file.name.split('.').pop().toLowerCase();
     if (['ppt', 'pptx'].includes(ext)) return 'PPT';
     if (['doc', 'docx'].includes(ext)) return 'DOCX';
+    if (['png', 'jpg', 'jpeg'].includes(ext)) return 'IMAGE';
     return 'PDF';
   };
 
-  const getFileSizeString = (file) => {
-    if (!file) return '0 KB';
-    if (file.size > 1024 * 1024) {
-      return (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+  const getFileSizeString = (sizeInBytesOrFile) => {
+    if (!sizeInBytesOrFile) return '0 KB';
+    const bytes = typeof sizeInBytesOrFile === 'number' ? sizeInBytesOrFile : sizeInBytesOrFile.size || 0;
+    if (bytes > 1024 * 1024) {
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
-    return (file.size / 1024).toFixed(0) + ' KB';
+    return (bytes / 1024).toFixed(0) + ' KB';
   };
 
-  // Handle resource submit
+  // Handle resource submit via real backend API
   const handleAddResSubmit = async (e) => {
     e.preventDefault();
-    if (!resTitle.trim() || !selectedFile) return;
+    if (!resTitle.trim() || !selectedFile || !resClassroomId) {
+      showToast('Please select a file, target classroom, and enter a title.', 'error');
+      return;
+    }
 
-    const calculatedType = getFileType(selectedFile);
-    const calculatedSize = getFileSizeString(selectedFile);
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('classroom_id', resClassroomId);
+    formData.append('title', resTitle.trim());
+    if (resDescription.trim()) formData.append('description', resDescription.trim());
+    if (resTags.trim()) formData.append('tags', resTags.trim());
 
-    await addResource(resClassroomId, resTitle, calculatedType, calculatedSize, selectedFile);
-    
-    setUploadSuccess('File uploaded successfully!');
-    setTimeout(() => {
-      setShowAddResModal(false);
-      setResTitle('');
-      setSelectedFile(null);
-      setResDescription('');
-      setUploadSuccess('');
-    }, 1500);
+    const result = await uploadResource(formData);
+    if (result && result.success) {
+      setUploadSuccess('File uploaded successfully!');
+      setTimeout(() => {
+        setShowAddResModal(false);
+        setResTitle('');
+        setResTags('');
+        setSelectedFile(null);
+        setResDescription('');
+        setUploadSuccess('');
+      }, 1200);
+    }
   };
 
-  // Filter resources based on user criteria
+  const handleDownload = async (resource) => {
+    try {
+      const filename = resource.original_filename || resource.title || 'downloaded-file';
+      await api.downloadResource(resource.id, filename);
+    } catch (err) {
+      showToast(err.message || 'Failed to download resource file.', 'error');
+    }
+  };
+
+  // Filter resources based on title, original filename, tags, classroom, and file type
   const filteredResources = resources.filter(res => {
-    const matchesSearch = res.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (res.classroomName || '').toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesClass = selectedClass === 'all' || res.classroomId === selectedClass;
-    const matchesType = selectedType === 'all' || res.type === selectedType;
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = (res.title || '').toLowerCase().includes(query) || 
+                          (res.original_filename || '').toLowerCase().includes(query) ||
+                          (res.tags || '').toLowerCase().includes(query) ||
+                          (res.classroom_name || res.classroomName || '').toLowerCase().includes(query);
+    const matchesClass = selectedClass === 'all' || strEquals(res.classroom_id || res.classroomId, selectedClass);
+    const matchesType = selectedType === 'all' || (res.file_type || res.type) === selectedType;
     return matchesSearch && matchesClass && matchesType;
   });
+
+  function strEquals(a, b) {
+    return String(a || '').toLowerCase() === String(b || '').toLowerCase();
+  }
 
   return (
     <div className="space-y-6">
@@ -113,9 +145,8 @@ export default function Resources() {
 
         {userRole === 'faculty' && (
           <button
-            onClick={handleAddClick}
-            className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-full bg-slate-400 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-500 transition-colors"
-            title="Uploads will be available in Phase 4"
+            onClick={() => setShowAddResModal(true)}
+            className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-indigo-700 transition-colors"
           >
             <Plus className="h-4 w-4" /> Add Resource
           </button>
@@ -131,7 +162,7 @@ export default function Resources() {
           </span>
           <input
             type="text"
-            placeholder="Search by title, subject..."
+            placeholder="Search by title, subject, tags..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-4 text-xs text-slate-800 outline-hidden transition-all focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500"
@@ -162,7 +193,8 @@ export default function Resources() {
             <option value="all">All File Types</option>
             <option value="PDF">PDF Documents</option>
             <option value="PPT">PowerPoint Slides</option>
-            <option value="DOCX">Word Documents</option>
+            <option value="DOC">Word Documents</option>
+            <option value="IMAGE">Images</option>
           </select>
         </div>
       </div>
@@ -182,7 +214,7 @@ export default function Resources() {
           <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
             {searchQuery || selectedClass !== 'all' || selectedType !== 'all' 
               ? 'No resources match your active search filters.' 
-              : 'Shared classroom materials will appear here once uploaded by faculty in Phase 4.'}
+              : 'Shared classroom materials will appear here once uploaded by faculty.'}
           </p>
         </div>
       ) : (
@@ -199,61 +231,67 @@ export default function Resources() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {filteredResources.map((res) => (
-                  <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-black text-xs ${
-                          res.type === 'PDF' ? 'bg-red-50 text-red-600' :
-                          res.type === 'PPT' ? 'bg-orange-50 text-orange-600' :
-                          'bg-blue-50 text-blue-600'
-                        }`}>
-                          {res.type}
+                {filteredResources.map((res) => {
+                  const typeTag = res.file_type || res.type || 'PDF';
+                  const uploader = res.uploader_name || res.uploadedBy || 'Faculty';
+                  const classroomName = res.classroom_name || res.classroomName || 'Classroom';
+                  const createdDate = res.created_at ? new Date(res.created_at).toLocaleDateString() : (res.uploadedDate || 'N/A');
+                  const formattedSize = getFileSizeString(res.file_size || res.size);
+
+                  return (
+                    <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-black text-xs ${
+                            typeTag === 'PDF' ? 'bg-red-50 text-red-600' :
+                            typeTag === 'PPT' ? 'bg-orange-50 text-orange-600' :
+                            typeTag === 'IMAGE' ? 'bg-emerald-50 text-emerald-600' :
+                            'bg-blue-50 text-blue-600'
+                          }`}>
+                            {typeTag}
+                          </div>
+                          <div>
+                            <button
+                              onClick={() => handleDownload(res)}
+                              className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
+                            >
+                              {res.title}
+                            </button>
+                            <span className="text-[10px] text-slate-400 font-semibold">{formattedSize} • By {uploader}</span>
+                          </div>
                         </div>
-                        <div>
-                          <button
-                            onClick={handlePreviewClick}
-                            className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
-                          >
-                            {res.title}
-                          </button>
-                          <span className="text-[10px] text-slate-400 font-semibold">{res.size || '2.0 MB'} • By {res.uploadedBy}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-700">
-                        {res.classroomName}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500 font-medium">{res.uploadedDate}</td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button 
-                        onClick={handlePreviewClick}
-                        className="cursor-pointer inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
-                        title="View Document"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button className="cursor-pointer inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" title="Download Resource">
-                        <Download className="h-4 w-4" />
-                      </button>
-                      {userRole === 'faculty' && (
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-700">
+                          {classroomName}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-500 font-medium">{createdDate}</td>
+                      <td className="px-6 py-4 text-right space-x-2">
                         <button 
-                          onClick={() => {
-                            if (window.confirm("Are you sure you want to delete this shared course resource? This action cannot be undone.")) {
-                              deleteResource(res.id);
-                            }
-                          }}
-                          className="cursor-pointer inline-flex items-center justify-center p-2 rounded-xl border border-rose-100 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors" 
-                          title="Delete Resource"
+                          onClick={() => handleDownload(res)}
+                          className="cursor-pointer inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
+                          title="Download Resource"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Download className="h-4 w-4" />
                         </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                        {userRole === 'faculty' && (
+                          <button 
+                            onClick={() => {
+                              if (window.confirm("Are you sure you want to delete this shared course resource? This action cannot be undone.")) {
+                                deleteResource(res.id);
+                              }
+                            }}
+                            className="cursor-pointer inline-flex items-center justify-center p-2 rounded-xl border border-rose-100 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors" 
+                            title="Delete Resource"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -283,7 +321,7 @@ export default function Resources() {
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
                 >
                   {classrooms.length === 0 ? (
-                    <option value="general">General Classroom</option>
+                    <option value="">No Classrooms Available</option>
                   ) : (
                     classrooms.map(c => (
                       <option key={c.id} value={c.id}>{c.subject}</option>
@@ -301,7 +339,7 @@ export default function Resources() {
                     id="resource-file-input"
                     onChange={handleFileChange}
                     className="hidden"
-                    accept=".pdf,.doc,.docx,.ppt,.pptx"
+                    accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg"
                   />
                   <label
                     htmlFor="resource-file-input"
@@ -329,6 +367,17 @@ export default function Resources() {
                   placeholder="Document Title (Auto-populated from file name)"
                   value={resTitle}
                   onChange={(e) => setResTitle(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tags (Optional) :</label>
+                <input
+                  type="text"
+                  placeholder="e.g. syllabus, lecture, unit1"
+                  value={resTags}
+                  onChange={(e) => setResTags(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
                 />
               </div>
@@ -371,11 +420,6 @@ export default function Resources() {
             </form>
           </div>
         </div>
-      )}
-
-      {/* DOCUMENT PREVIEW MODAL */}
-      {previewFile && (
-        <DocumentViewer file={previewFile} onClose={() => setPreviewFile(null)} />
       )}
 
     </div>

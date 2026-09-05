@@ -33,7 +33,9 @@ export default function ClassroomDetails() {
     error,
     showToast,
     fetchClassrooms,
-    addResource, 
+    loadResources,
+    fetchClassroomResources,
+    uploadResource, 
     addAnnouncement,
     deleteResource,
     deleteAnnouncement,
@@ -41,24 +43,16 @@ export default function ClassroomDetails() {
     deleteClassroom
   } = useUser();
 
-  const handleAddResClick = () => {
-    showToast('Resource upload will be available in Phase 4.', 'info');
-  };
-
-  const handleAddAnnClick = () => {
-    showToast('Announcement creation will be available in Phase 4.', 'info');
-  };
-
-  const handlePreviewClick = () => {
-    showToast('Document preview will be available in Phase 4.', 'info');
-  };
-
   const [previewFile, setPreviewFile] = useState(null);
   const [enrolledStudents, setEnrolledStudents] = useState([]);
 
   useEffect(() => {
     fetchClassrooms();
-  }, []);
+    loadResources();
+    if (id) {
+      fetchClassroomResources(id);
+    }
+  }, [id]);
 
   // Find target classroom safely
   const classroom = classrooms.find(c => c.id === id) || (classrooms.length > 0 ? classrooms[0] : null);
@@ -70,6 +64,7 @@ export default function ClassroomDetails() {
   const [copied, setCopied] = useState(false);
   const [showAddResModal, setShowAddResModal] = useState(false);
   const [resTitle, setResTitle] = useState('');
+  const [resTags, setResTags] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState('');
   const [resDescription, setResDescription] = useState('');
@@ -89,6 +84,7 @@ export default function ClassroomDetails() {
     const ext = file.name.split('.').pop().toLowerCase();
     if (['ppt', 'pptx'].includes(ext)) return 'PPT';
     if (['doc', 'docx'].includes(ext)) return 'DOCX';
+    if (['png', 'jpg', 'jpeg'].includes(ext)) return 'IMAGE';
     return 'PDF';
   };
 
@@ -113,24 +109,30 @@ export default function ClassroomDetails() {
     }
   };
 
-  // Add Resource Action
+  // Add Resource Action using real backend FormData endpoint
   const handleAddResourceSubmit = async (e) => {
     e.preventDefault();
     if (!resTitle.trim() || !selectedFile || !classroom) return;
 
-    const calculatedType = getFileType(selectedFile);
-    const calculatedSize = getFileSizeString(selectedFile);
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('classroom_id', classroom.id);
+    formData.append('title', resTitle.trim());
+    if (resDescription.trim()) formData.append('description', resDescription.trim());
+    if (resTags.trim()) formData.append('tags', resTags.trim());
 
-    await addResource(classroom.id, resTitle, calculatedType, calculatedSize, selectedFile);
-    
-    setUploadSuccess('File uploaded successfully!');
-    setTimeout(() => {
-      setShowAddResModal(false);
-      setResTitle('');
-      setSelectedFile(null);
-      setResDescription('');
-      setUploadSuccess('');
-    }, 1500);
+    const result = await uploadResource(formData);
+    if (result && result.success) {
+      setUploadSuccess('File uploaded successfully!');
+      setTimeout(() => {
+        setShowAddResModal(false);
+        setResTitle('');
+        setResTags('');
+        setSelectedFile(null);
+        setResDescription('');
+        setUploadSuccess('');
+      }, 1200);
+    }
   };
 
   // Add Announcement Action
@@ -144,7 +146,9 @@ export default function ClassroomDetails() {
   };
 
   // Filters resources and announcements specifically for this classroom
-  const classResources = classroom ? resources.filter(r => r.classroomId === classroom.id) : [];
+  const classResources = classroom 
+    ? resources.filter(r => String(r.classroom_id || r.classroomId) === String(classroom.id)) 
+    : [];
   const classAnnouncements = classroom ? announcements.filter(a => a.classroomId === classroom.id) : [];
 
   useEffect(() => {
@@ -331,9 +335,8 @@ export default function ClassroomDetails() {
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Class Documents</h3>
               {userRole === 'faculty' && (
                 <button
-                  onClick={handleAddResClick}
-                  className="cursor-pointer inline-flex items-center gap-1 rounded-full bg-slate-400 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-500 transition-colors"
-                  title="Uploads will be available in Phase 4"
+                  onClick={() => setShowAddResModal(true)}
+                  className="cursor-pointer inline-flex items-center gap-1 rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition-colors"
                 >
                   <Plus className="h-4 w-4" /> Add Resources
                 </button>
@@ -350,7 +353,11 @@ export default function ClassroomDetails() {
               <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center">
                 <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
                 <h4 className="text-sm font-bold text-slate-700">No resources uploaded yet</h4>
-                <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">This feature will be available in Phase 4.</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                  {userRole === 'faculty' 
+                    ? 'Click "Add Resources" to upload course slides, PDFs, or lecture notes for students.' 
+                    : 'Course materials uploaded by faculty will appear here.'}
+                </p>
               </div>
             ) : (
               <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs">
@@ -365,57 +372,63 @@ export default function ClassroomDetails() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {classResources.map((res) => (
-                        <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className={`flex h-8 w-8 items-center justify-center rounded-lg font-black text-[10px] ${
-                                res.type === 'PDF' ? 'bg-red-50 text-red-600' :
-                                res.type === 'PPT' ? 'bg-orange-50 text-orange-600' :
-                                'bg-blue-50 text-blue-600'
-                              }`}>
-                                {res.type}
+                      {classResources.map((res) => {
+                        const typeTag = res.file_type || res.type || 'PDF';
+                        const uploader = res.uploader_name || res.uploadedBy || 'Faculty';
+                        const createdDate = res.created_at ? new Date(res.created_at).toLocaleDateString() : (res.uploadedDate || 'N/A');
+                        const bytes = typeof res.file_size === 'number' ? res.file_size : null;
+                        const formattedSize = bytes ? (bytes > 1024 * 1024 ? (bytes / (1024 * 1024)).toFixed(1) + ' MB' : (bytes / 1024).toFixed(0) + ' KB') : (res.size || 'N/A');
+
+                        return (
+                          <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className={`flex h-8 w-8 items-center justify-center rounded-lg font-black text-[10px] ${
+                                  typeTag === 'PDF' ? 'bg-red-50 text-red-600' :
+                                  typeTag === 'PPT' ? 'bg-orange-50 text-orange-600' :
+                                  typeTag === 'IMAGE' ? 'bg-emerald-50 text-emerald-600' :
+                                  'bg-blue-50 text-blue-600'
+                                }`}>
+                                  {typeTag}
+                                </div>
+                                <div>
+                                  <button
+                                    onClick={() => api.downloadResource(res.id, res.original_filename || res.title)}
+                                    className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
+                                  >
+                                    {res.title}
+                                  </button>
+                                  <span className="text-[10px] text-slate-400 font-semibold">{formattedSize} • By {uploader}</span>
+                                </div>
                               </div>
-                              <div>
-                                <button
-                                  onClick={handlePreviewClick}
-                                  className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
-                                >
-                                  {res.title}
-                                </button>
-                                <span className="text-[10px] text-slate-400 font-semibold">{res.size || '1.8 MB'} • By {res.uploadedBy}</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 font-bold text-slate-500">{res.type}</td>
-                          <td className="px-6 py-4 text-slate-500">{res.uploadedDate}</td>
-                          <td className="px-6 py-4 text-right space-x-2">
-                            <button 
-                              onClick={handlePreviewClick}
-                              className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
-                              title="View Document"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </button>
-                            <button className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" title="Download Document">
-                              <Download className="h-4 w-4" />
-                            </button>
-                            {userRole === 'faculty' && (
+                            </td>
+                            <td className="px-6 py-4 font-bold text-slate-500">{typeTag}</td>
+                            <td className="px-6 py-4 text-slate-500">{createdDate}</td>
+                            <td className="px-6 py-4 text-right space-x-2">
                               <button 
-                                onClick={() => {
-                                  if (window.confirm("Are you sure you want to delete this classroom resource? This action cannot be undone.")) {
-                                    deleteResource(res.id);
-                                  }
-                                }}
-                                className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-rose-100 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors" 
-                                title="Delete Document"
+                                onClick={() => api.downloadResource(res.id, res.original_filename || res.title)}
+                                className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
+                                title="Download File"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Download className="h-4 w-4" />
                               </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                              {userRole === 'faculty' && (
+                                <button 
+                                  onClick={() => {
+                                    if (window.confirm("Are you sure you want to delete this classroom resource? This action cannot be undone.")) {
+                                      deleteResource(res.id);
+                                    }
+                                  }}
+                                  className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-rose-100 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors" 
+                                  title="Delete Document"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -639,7 +652,7 @@ export default function ClassroomDetails() {
                     id="details-resource-file-input"
                     onChange={handleFileChange}
                     className="hidden"
-                    accept=".pdf,.doc,.docx,.ppt,.pptx"
+                    accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg"
                   />
                   <label
                     htmlFor="details-resource-file-input"
@@ -664,9 +677,20 @@ export default function ClassroomDetails() {
                 <input
                   type="text"
                   required
-                  placeholder="Document Title (Auto-populated from file name)"
+                  placeholder="Resource Title"
                   value={resTitle}
                   onChange={(e) => setResTitle(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tags (Optional) :</label>
+                <input
+                  type="text"
+                  placeholder="e.g. syllabus, lecture1, lab"
+                  value={resTags}
+                  onChange={(e) => setResTags(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
                 />
               </div>

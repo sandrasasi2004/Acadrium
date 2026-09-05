@@ -54,6 +54,7 @@ class User(Base):
     # Relationships
     created_classrooms = relationship("Classroom", back_populates="faculty", cascade="all, delete-orphan")
     memberships = relationship("ClassroomMember", back_populates="student", cascade="all, delete-orphan")
+    uploaded_resources = relationship("Resource", back_populates="uploader", cascade="all, delete-orphan")
 
     def to_dict(self):
         return {

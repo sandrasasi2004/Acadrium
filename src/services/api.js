@@ -215,43 +215,79 @@ export async function updateClassroom(classroomId, updateData) {
 }
 
 // ==========================================
-// RESOURCE APIs (Prepared for Phase 3)
+// RESOURCE APIs (Phase 4 Real Backend Integration)
 // ==========================================
 
 export async function listResources(params = {}) {
   const query = new URLSearchParams(params).toString();
   const endpoint = `/resources${query ? `?${query}` : ''}`;
   const res = await fetchApi(endpoint, { method: 'GET' });
-  if (!res.success) {
-    return { success: true, data: [] };
-  }
   return res;
 }
 
-export async function uploadResource(resourceData) {
-  const res = await fetchApi('/resources', {
-    method: 'POST',
-    body: JSON.stringify(resourceData),
-  });
+export async function getClassroomResources(classroomId) {
+  const res = await fetchApi(`/resources/classroom/${classroomId}`, { method: 'GET' });
+  return res;
+}
 
-  if (!res.success) {
-    const newResource = {
-      id: `res_${Date.now()}`,
-      title: resourceData.title,
-      type: (resourceData.type || 'PDF').toUpperCase(),
-      uploadedDate: new Date().toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      }),
-      classroomId: resourceData.classroomId,
-      classroomName: resourceData.classroomName || 'General',
-      size: resourceData.size || '1.5 MB',
-      uploadedBy: resourceData.uploadedBy || 'Faculty User',
-      fileObj: resourceData.fileObj || null
-    };
-    return { success: true, data: newResource };
+export async function getResource(resourceId) {
+  const res = await fetchApi(`/resources/${resourceId}`, { method: 'GET' });
+  return res;
+}
+
+export async function uploadResource(formData) {
+  const url = `${API_BASE_URL}/resources/upload`;
+  const headers = getAuthHeaders(); // Do NOT set Content-Type header so browser sets boundary for FormData
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const errorDetail = data.detail || data.message || `HTTP Error ${response.status}`;
+      return { success: false, error: errorDetail };
+    }
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err.message || 'Failed to upload resource file.' };
   }
+}
+
+export async function downloadResource(resourceId, filename = 'downloaded_file') {
+  const url = `${API_BASE_URL}/resources/${resourceId}/download`;
+  const headers = getAuthHeaders();
+
+  try {
+    const response = await fetch(url, { method: 'GET', headers });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return { success: false, error: data.detail || 'Download failed.' };
+    }
+
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(blobUrl);
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message || 'Download error.' };
+  }
+}
+
+export async function deleteResource(resourceId) {
+  const res = await fetchApi(`/resources/${resourceId}`, {
+    method: 'DELETE',
+  });
   return res;
 }
 
