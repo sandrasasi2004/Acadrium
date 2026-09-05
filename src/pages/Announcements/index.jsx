@@ -9,9 +9,14 @@ export default function Announcements() {
     classrooms, 
     isLoading,
     error,
+    showToast,
     addAnnouncement,
     deleteAnnouncement
   } = useUser();
+
+  const handleAddClick = () => {
+    showToast('Announcement creation will be available in Phase 4.', 'info');
+  };
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,8 +66,9 @@ export default function Announcements() {
 
         {userRole === 'faculty' && (
           <button
-            onClick={() => setShowAddAnnModal(true)}
-            className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-indigo-700 transition-colors"
+            onClick={handleAddClick}
+            className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-full bg-slate-400 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-500 transition-colors"
+            title="Announcement creation will be available in Phase 4"
           >
             <Plus className="h-4 w-4" /> Add Announcement
           </button>

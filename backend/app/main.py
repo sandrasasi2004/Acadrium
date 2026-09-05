@@ -4,6 +4,7 @@ from app.database.config import settings
 from app.database.session import engine, Base
 from app.middleware.cors import setup_cors
 from app.routes.auth import router as auth_router
+from app.routes.classrooms import router as classrooms_router
 
 # Configure root logger for detailed diagnostic logging
 logging.basicConfig(
@@ -30,9 +31,10 @@ app = FastAPI(
 # Enable CORS
 setup_cors(app)
 
-# Include Auth Router under /api
+# Include Auth Router & Classrooms Router under /api
 app.include_router(auth_router, prefix=settings.API_V1_STR)
-logger.info(f"[FastAPI Startup] Auth router registered with prefix: {settings.API_V1_STR}/auth")
+app.include_router(classrooms_router, prefix=settings.API_V1_STR)
+logger.info(f"[FastAPI Startup] Auth & Classrooms routers registered under prefix: {settings.API_V1_STR}")
 
 @app.get("/")
 def root():

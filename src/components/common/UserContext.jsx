@@ -60,16 +60,6 @@ export function UserProvider({ children }) {
           const userObj = profileRes.data;
           setCurrentUser(userObj);
           setUserRole(userObj.role || 'student');
-          
-          // Optionally fetch initial classroom data once authenticated
-          const [clsRes, resRes, annRes] = await Promise.all([
-            api.listClassrooms(),
-            api.listResources(),
-            api.listAnnouncements()
-          ]);
-          if (clsRes.success) setClassrooms(clsRes.data || []);
-          if (resRes.success) setResources(resRes.data || []);
-          if (annRes.success) setAnnouncements(annRes.data || []);
         } else {
           // Token expired or invalid -> logout session
           localStorage.removeItem('token');
@@ -88,23 +78,64 @@ export function UserProvider({ children }) {
   const myNotes = userRole === 'faculty' ? facultyNotes : studentNotes;
   const myUploads = userRole === 'faculty' ? facultyUploads : studentUploads;
 
-  // Real Authentication Actions
-  const login = async (role, username, password) => {
+  // Classroom API Actions
+  const fetchClassrooms = async () => {
     setIsLoading(true);
     setError(null);
-    const res = await api.login({ role, username, password });
+    const res = await api.listClassrooms();
+    setIsLoading(false);
+    if (res.success && Array.isArray(res.data)) {
+      setClassrooms(res.data);
+      return res.data;
+    } else {
+      setClassrooms([]);
+      if (res.error) {
+        setError(res.error);
+      }
+      return [];
+    }
+  };
+
+  // Real Authentication Actions
+  const login = async (param1, param2, param3) => {
+    let emailVal, pwdVal, roleVal;
+
+    if (typeof param1 === 'object' && param1 !== null) {
+      emailVal = param1.email || param1.username;
+      pwdVal = param1.password;
+      roleVal = param1.role;
+    } else if (param3 !== undefined) {
+      // Legacy signature: (role, email, password)
+      roleVal = param1;
+      emailVal = param2;
+      pwdVal = param3;
+    } else {
+      // Refined signature: (email, password)
+      emailVal = param1;
+      pwdVal = param2;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    const loginPayload = { email: emailVal, password: pwdVal };
+    if (roleVal) {
+      loginPayload.role = roleVal;
+    }
+
+    const res = await api.login(loginPayload);
     setIsLoading(false);
     
     if (res.success && res.data?.token) {
       const newToken = res.data.token;
       const userObj = res.data.user;
+      const detectedRole = userObj.role || roleVal || 'student';
 
       localStorage.setItem('token', newToken);
       setToken(newToken);
       setCurrentUser(userObj);
-      setUserRole(userObj.role || role);
-      showToast(`Logged in successfully as ${userObj.name || (role === 'faculty' ? 'Faculty User' : 'Student User')}`, 'success');
-      return { success: true };
+      setUserRole(detectedRole);
+      showToast(`Logged in successfully as ${userObj.full_name || userObj.name || (detectedRole === 'faculty' ? 'Faculty User' : 'Student User')}`, 'success');
+      return { success: true, user: userObj };
     } else {
       const errorMsg = res.error || 'Login failed. Invalid credentials.';
       setError(errorMsg);
@@ -156,19 +187,21 @@ export function UserProvider({ children }) {
     showToast('Profile picture updated!', 'success');
   };
 
-  const createClassroom = async (subject, semester, description) => {
+  const createClassroom = async (subject, semester, description, subjectCode = '', department = 'Computer Applications') => {
     const payload = {
+      name: subject,
       subject,
-      semester,
-      description,
-      facultyId: currentUser?.id || 'fac_user',
-      facultyName: currentUser?.name || 'Faculty User'
+      subject_code: subjectCode,
+      courseCode: subjectCode,
+      semester: semester || 'Semester III',
+      department: department || 'Computer Applications',
+      description
     };
 
     const res = await api.createClassroom(payload);
     if (res.success && res.data) {
-      setClassrooms(prev => [res.data, ...prev]);
       showToast('Classroom created successfully!', 'success');
+      await fetchClassrooms();
       return res.data;
     }
     showToast(res.error || 'Failed to create classroom', 'error');
@@ -176,46 +209,45 @@ export function UserProvider({ children }) {
   };
 
   const joinClassroom = async (inviteCode) => {
-    const targetClass = classrooms.find(c => c.inviteCode === inviteCode);
-    if (targetClass) {
-      const updated = classrooms.map(c => {
-        if (c.inviteCode === inviteCode) {
-          return { ...c, studentCount: (c.studentCount || 0) + 1 };
-        }
-        return c;
-      });
-      setClassrooms(updated);
-      showToast(`Successfully joined ${targetClass.subject}!`, 'success');
-      return { success: true, subject: targetClass.subject };
+    if (!inviteCode || !inviteCode.trim()) {
+      showToast('Please enter a valid classroom code.', 'error');
+      return { success: false, message: 'Please enter a valid classroom code.' };
     }
-    
-    const res = await api.joinClassroom(inviteCode);
+
+    const res = await api.joinClassroom(inviteCode.trim());
+    if (res.success && res.data) {
+      const classroomObj = res.data.classroom || {};
+      const subjectName = classroomObj.name || classroomObj.subject || 'Classroom';
+      showToast(`Successfully joined ${subjectName}!`, 'success');
+      await fetchClassrooms();
+      return { success: true, subject: subjectName, classroom: classroomObj };
+    }
+
+    const errorMsg = res.error || 'Classroom not found. Check invite code.';
+    showToast(errorMsg, 'error');
+    return { success: false, message: errorMsg };
+  };
+
+  const leaveClassroom = async (id) => {
+    const res = await api.leaveClassroom(id);
     if (res.success) {
-      showToast('Successfully joined classroom!', 'success');
-      return { success: true, subject: 'Classroom' };
+      showToast('Successfully left classroom', 'success');
+      await fetchClassrooms();
+      return { success: true };
     }
-
-    showToast('Classroom not found. Check invite code.', 'error');
-    return { success: false, message: 'Classroom not found. Check the invite code.' };
+    showToast(res.error || 'Failed to leave classroom', 'error');
+    return { success: false, error: res.error };
   };
 
-  const leaveClassroom = (id) => {
-    const targetClass = classrooms.find(c => c.id === id);
-    if (targetClass) {
-      const updated = classrooms.map(c => {
-        if (c.id === id) {
-          return { ...c, studentCount: Math.max(0, (c.studentCount || 0) - 1) };
-        }
-        return c;
-      });
-      setClassrooms(updated);
-      showToast(`Left classroom ${targetClass.subject}`, 'success');
+  const deleteClassroom = async (id) => {
+    const res = await api.deleteClassroom(id);
+    if (res.success) {
+      showToast('Classroom deleted successfully', 'success');
+      await fetchClassrooms();
+      return { success: true };
     }
-  };
-
-  const deleteClassroom = (id) => {
-    setClassrooms(prev => prev.filter(c => c.id !== id));
-    showToast('Classroom deleted successfully', 'success');
+    showToast(res.error || 'Failed to delete classroom', 'error');
+    return { success: false, error: res.error };
   };
 
   const addResource = async (classroomId, title, type, size, fileObj = null) => {
@@ -370,6 +402,7 @@ export function UserProvider({ children }) {
       error,
       toast,
       showToast,
+      fetchClassrooms,
       login,
       register,
       logout,

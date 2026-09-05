@@ -10,6 +10,7 @@ export default function Resources() {
     classrooms, 
     isLoading,
     error,
+    showToast,
     addResource,
     deleteResource
   } = useUser();
@@ -28,6 +29,14 @@ export default function Resources() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState('');
   const [resDescription, setResDescription] = useState('');
+
+  const handleAddClick = () => {
+    showToast('Resource upload will be available in Phase 4.', 'info');
+  };
+
+  const handlePreviewClick = () => {
+    showToast('Document preview will be available in Phase 4.', 'info');
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -104,8 +113,9 @@ export default function Resources() {
 
         {userRole === 'faculty' && (
           <button
-            onClick={() => setShowAddResModal(true)}
-            className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-indigo-700 transition-colors"
+            onClick={handleAddClick}
+            className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-full bg-slate-400 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-500 transition-colors"
+            title="Uploads will be available in Phase 4"
           >
             <Plus className="h-4 w-4" /> Add Resource
           </button>
@@ -172,7 +182,7 @@ export default function Resources() {
           <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
             {searchQuery || selectedClass !== 'all' || selectedType !== 'all' 
               ? 'No resources match your active search filters.' 
-              : 'Shared classroom materials will appear here once uploaded by faculty.'}
+              : 'Shared classroom materials will appear here once uploaded by faculty in Phase 4.'}
           </p>
         </div>
       ) : (
@@ -202,7 +212,7 @@ export default function Resources() {
                         </div>
                         <div>
                           <button
-                            onClick={() => setPreviewFile(res)}
+                            onClick={handlePreviewClick}
                             className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
                           >
                             {res.title}
@@ -219,7 +229,7 @@ export default function Resources() {
                     <td className="px-6 py-4 text-slate-500 font-medium">{res.uploadedDate}</td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <button 
-                        onClick={() => setPreviewFile(res)}
+                        onClick={handlePreviewClick}
                         className="cursor-pointer inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
                         title="View Document"
                       >

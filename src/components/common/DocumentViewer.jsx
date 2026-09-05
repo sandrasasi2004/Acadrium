@@ -64,156 +64,18 @@ export default function DocumentViewer({ file, onClose }) {
     showToast(`Downloading: ${file.title}`, 'success');
   };
 
-  // Mock content generation for preview
+  // Phase 4 placeholder notice for preview
   const renderDocumentContent = () => {
-    if (isImage) {
-      if (realFileUrl) {
-        return (
-          <div className="flex items-center justify-center p-4">
-            <img 
-              src={realFileUrl} 
-              alt={file.title} 
-              className="max-h-[500px] object-contain rounded-lg shadow-md transition-transform duration-200"
-              style={{ transform: `scale(${zoom})` }}
-            />
-          </div>
-        );
-      }
-      return (
-        <div className="flex flex-col items-center justify-center p-8 text-center" style={{ transform: `scale(${zoom})` }}>
-          <div className="h-48 w-64 bg-slate-100 rounded-lg shadow-inner flex items-center justify-center text-slate-400">
-            <ImageIcon className="h-16 w-16" />
-          </div>
-          <p className="mt-4 text-xs font-bold text-slate-500">Image Sandbox Preview Mode</p>
-        </div>
-      );
-    }
-
-    if (isText) {
-      return (
-        <div 
-          className="text-left font-mono text-xs bg-slate-50 p-6 rounded-xl border border-slate-200 overflow-auto max-h-[550px] leading-relaxed transition-transform"
-          style={{ transform: `scale(${zoom})` }}
-        >
-          {textContent || "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. (Mock text log)"}
-        </div>
-      );
-    }
-
-    if (isPdf) {
-      return (
-        <div 
-          className="text-left space-y-4 transition-transform duration-200"
-          style={{ transform: `scale(${zoom})` }}
-        >
-          <div className="border-b border-indigo-100 pb-3 flex items-center justify-between">
-            <span className="text-[10px] uppercase font-bold text-indigo-650 bg-indigo-50 px-2.5 py-0.5 rounded-full">Handout Page {currentPage}</span>
-            <span className="text-[10px] font-semibold text-slate-400">DBMS Study Guide</span>
-          </div>
-
-          {currentPage === 1 && (
-            <div className="space-y-4">
-              <h2 className="text-base font-black text-slate-800 border-l-4 border-indigo-600 pl-2">Section 1. Relational Database Concepts</h2>
-              <p className="text-xs text-slate-655 font-semibold leading-relaxed">
-                A relational database is a digital database based on the relational model of data. Relational databases are built using relations (tables) representing attributes and tuples. Normalized relation structures prevent transaction update anomalies.
-              </p>
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-[11px] font-mono leading-relaxed">
-                SELECT subject_id, count(student_id)<br />
-                FROM enrollments<br />
-                GROUP BY subject_id;
-              </div>
-            </div>
-          )}
-
-          {currentPage === 2 && (
-            <div className="space-y-4">
-              <h2 className="text-base font-black text-slate-800 border-l-4 border-indigo-600 pl-2">Section 2. Database Normalization Forms</h2>
-              <p className="text-xs text-slate-655 font-semibold leading-relaxed">
-                Normalization is the process of structuring a relational database in accordance with a series of normal forms to reduce redundancy and improve data integrity.
-              </p>
-              <ul className="text-xs text-slate-655 font-semibold list-disc pl-5 space-y-2">
-                <li><strong>First Normal Form (1NF):</strong> All attributes contain only atomic (indivisible) values.</li>
-                <li><strong>Second Normal Form (2NF):</strong> Must be in 1NF and all non-key attributes are fully functionally dependent on the primary key.</li>
-                <li><strong>Third Normal Form (3NF):</strong> Must be in 2NF and no transitive functional dependencies exist.</li>
-              </ul>
-            </div>
-          )}
-
-          {currentPage === 3 && (
-            <div className="space-y-4">
-              <h2 className="text-base font-black text-slate-800 border-l-4 border-indigo-600 pl-2">Section 3. Boyce-Codd Normal Form (BCNF)</h2>
-              <p className="text-xs text-slate-655 font-semibold leading-relaxed">
-                Boyce-Codd Normal Form (BCNF) is a slightly stronger version of the Third Normal Form (3NF). A relation is in BCNF if and only if, for every one of its non-trivial functional dependencies X &rarr; Y, X is a superkey.
-              </p>
-              <p className="text-xs text-slate-500 italic">Example scenario: Table R(A, B, C) where dependencies are A &rarr; B and C &rarr; A. Normalizing this involves splitting the relation to avoid dependency preservation issues.</p>
-            </div>
-          )}
-
-          {currentPage >= 4 && (
-            <div className="space-y-4">
-              <h2 className="text-base font-black text-slate-800 border-l-4 border-indigo-600 pl-2">Section {currentPage}. DBMS Transaction Management</h2>
-              <p className="text-xs text-slate-655 font-semibold leading-relaxed">
-                Transactions represent a unit of execution. In DBMS, transactions follow the ACID properties: Atomicity, Consistency, Isolation, and Durability.
-              </p>
-              <div className="rounded-xl border border-slate-200 bg-amber-50/50 p-4 text-xs font-semibold text-amber-800">
-                Concurrency issues like dirty read, non-repeatable read, and phantom reads are controlled via Isolation Levels (Serializable, Repeatable Read, Read Committed, Read Uncommitted).
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (isPpt) {
-      return (
-        <div 
-          className="text-left space-y-6 transition-transform duration-200"
-          style={{ transform: `scale(${zoom})` }}
-        >
-          <div className="h-56 bg-slate-900 rounded-2xl p-6 text-white flex flex-col justify-between relative overflow-hidden shadow-md">
-            <div className="absolute right-0 top-0 h-28 w-28 rounded-full bg-indigo-500/10 blur-xl"></div>
-            <div>
-              <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest bg-indigo-950 px-2.5 py-0.5 rounded-full border border-indigo-900">Slide {currentPage}</span>
-              <h2 className="text-base font-extrabold mt-3 tracking-tight">{currentPage === 1 ? file.title : `Module Topic ${currentPage}`}</h2>
-            </div>
-            <p className="text-[11px] text-slate-350 leading-relaxed font-semibold">
-              {currentPage === 1 
-                ? "Academic Presentation Lecture Slides Deck - Relational DB normalizations and search heuristics models."
-                : `Slide details explaining sub-topic logs. f(n) evaluation heuristics, heuristics modeling, and VPC subnet settings.`
-              }
-            </p>
-          </div>
-          <div className="space-y-2">
-            <h4 className="text-xs font-black text-slate-700">Slide Notes:</h4>
-            <p className="text-xs text-slate-500 leading-relaxed">Ensure students review the diagrams explaining normalizations. Concurrency protocols will be tested in internal examinations.</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (isWord) {
-      return (
-        <div 
-          className="text-left space-y-4 transition-transform duration-200"
-          style={{ transform: `scale(${zoom})` }}
-        >
-          <h2 className="text-base font-extrabold text-slate-800 underline decoration-indigo-500 decoration-2">{file.title}</h2>
-          <p className="text-xs text-slate-655 font-semibold leading-relaxed">
-            This Word Document file contains class notes, lecture manuals, and exam agendas compiled for study purposes. Ensure you read this resource alongside relational normalization slides.
-          </p>
-          <p className="text-xs text-slate-655 font-semibold leading-relaxed">
-            Boyce-Codd Normal Form (BCNF), transaction logs, and locking protocols represent core components of Relational Database systems. Write down responses for query exercises before next lab.
-          </p>
-        </div>
-      );
-    }
-
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center">
-        <FileText className="h-12 w-12 text-slate-300 mb-3" />
-        <p className="text-xs text-slate-600 font-bold leading-relaxed max-w-sm">
-          Document preview will be available after backend integration.
+      <div className="flex flex-col items-center justify-center p-12 text-center my-8">
+        <FileText className="h-16 w-16 text-indigo-400 mb-4 animate-bounce" />
+        <h3 className="text-base font-extrabold text-slate-800">Document Preview Unavailable</h3>
+        <p className="text-xs font-semibold text-slate-500 mt-2 max-w-md leading-relaxed">
+          Full document rendering and file preview functionality will be enabled in <span className="font-bold text-indigo-600">Phase 4 (Resource Upload & Management)</span>.
         </p>
+        <div className="mt-6 rounded-2xl bg-indigo-50 border border-indigo-100 p-3.5 text-[11px] font-bold text-indigo-700">
+          File Name: {file.title} • Format: {file.type} • Size: {file.size || 'N/A'}
+        </div>
       </div>
     );
   };

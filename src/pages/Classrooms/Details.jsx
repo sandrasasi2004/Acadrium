@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useUser } from '../../components/common/UserContext';
+import * as api from '../../services/api';
 import { 
   ArrowLeft, 
   Users, 
@@ -30,6 +31,8 @@ export default function ClassroomDetails() {
     announcements, 
     isLoading,
     error,
+    showToast,
+    fetchClassrooms,
     addResource, 
     addAnnouncement,
     deleteResource,
@@ -38,7 +41,24 @@ export default function ClassroomDetails() {
     deleteClassroom
   } = useUser();
 
+  const handleAddResClick = () => {
+    showToast('Resource upload will be available in Phase 4.', 'info');
+  };
+
+  const handleAddAnnClick = () => {
+    showToast('Announcement creation will be available in Phase 4.', 'info');
+  };
+
+  const handlePreviewClick = () => {
+    showToast('Document preview will be available in Phase 4.', 'info');
+  };
+
   const [previewFile, setPreviewFile] = useState(null);
+  const [enrolledStudents, setEnrolledStudents] = useState([]);
+
+  useEffect(() => {
+    fetchClassrooms();
+  }, []);
 
   // Find target classroom safely
   const classroom = classrooms.find(c => c.id === id) || (classrooms.length > 0 ? classrooms[0] : null);
@@ -126,7 +146,22 @@ export default function ClassroomDetails() {
   // Filters resources and announcements specifically for this classroom
   const classResources = classroom ? resources.filter(r => r.classroomId === classroom.id) : [];
   const classAnnouncements = classroom ? announcements.filter(a => a.classroomId === classroom.id) : [];
-  const enrolledStudents = []; // Dynamic empty array ready for backend API response
+
+  useEffect(() => {
+    async function loadStudents() {
+      if (classroom?.id && activeTab === 'students') {
+        const res = await api.getClassroomStudents(classroom.id);
+        if (res.success && Array.isArray(res.data)) {
+          setEnrolledStudents(res.data);
+        } else if (Array.isArray(res)) {
+          setEnrolledStudents(res);
+        } else {
+          setEnrolledStudents([]);
+        }
+      }
+    }
+    loadStudents();
+  }, [classroom?.id, activeTab]);
 
   if (!classroom && !isLoading) {
     return (
@@ -296,8 +331,9 @@ export default function ClassroomDetails() {
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Class Documents</h3>
               {userRole === 'faculty' && (
                 <button
-                  onClick={() => setShowAddResModal(true)}
-                  className="cursor-pointer inline-flex items-center gap-1 rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+                  onClick={handleAddResClick}
+                  className="cursor-pointer inline-flex items-center gap-1 rounded-full bg-slate-400 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-500 transition-colors"
+                  title="Uploads will be available in Phase 4"
                 >
                   <Plus className="h-4 w-4" /> Add Resources
                 </button>
@@ -314,7 +350,7 @@ export default function ClassroomDetails() {
               <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center">
                 <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
                 <h4 className="text-sm font-bold text-slate-700">No resources uploaded yet</h4>
-                <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">Get started by uploading lectures, manuals, and slides for students.</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">This feature will be available in Phase 4.</p>
               </div>
             ) : (
               <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs">
@@ -342,7 +378,7 @@ export default function ClassroomDetails() {
                               </div>
                               <div>
                                 <button
-                                  onClick={() => setPreviewFile(res)}
+                                  onClick={handlePreviewClick}
                                   className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
                                 >
                                   {res.title}
@@ -355,7 +391,7 @@ export default function ClassroomDetails() {
                           <td className="px-6 py-4 text-slate-500">{res.uploadedDate}</td>
                           <td className="px-6 py-4 text-right space-x-2">
                             <button 
-                              onClick={() => setPreviewFile(res)}
+                              onClick={handlePreviewClick}
                               className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
                               title="View Document"
                             >
@@ -441,8 +477,9 @@ export default function ClassroomDetails() {
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Class Announcements</h3>
               {userRole === 'faculty' && (
                 <button
-                  onClick={() => setShowAddAnnModal(true)}
-                  className="cursor-pointer inline-flex items-center gap-1 rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+                  onClick={handleAddAnnClick}
+                  className="cursor-pointer inline-flex items-center gap-1 rounded-full bg-slate-400 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-500 transition-colors"
+                  title="Announcement creation will be available in Phase 4"
                 >
                   <Plus className="h-4 w-4" /> Add Announcement
                 </button>

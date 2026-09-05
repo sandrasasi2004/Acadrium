@@ -84,16 +84,8 @@ def authenticate_user(db: Session, login_data: UserLogin):
             detail="Invalid email or password.",
         )
 
-    # If role is passed, sync user role if applicable or validate
-    if login_data.role and login_data.role in ["faculty", "student"]:
-        if user.role != login_data.role:
-            user.role = login_data.role
-            db.commit()
-            db.refresh(user)
-            logger.info(f"[Auth Service] User role updated to: {user.role}")
-
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
-    logger.info(f"[Auth Service] Login SUCCESS. Returned JWT token for user ID: {user.id}")
+    logger.info(f"[Auth Service] Login SUCCESS. Returned JWT token for user ID: {user.id}, role: {user.role}")
 
     return {
         "access_token": access_token,

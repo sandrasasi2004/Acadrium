@@ -17,7 +17,7 @@ class UserLogin(BaseModel):
     email: Optional[str] = None
     username: Optional[str] = None
     password: str
-    role: Optional[str] = "student"
+    role: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: str

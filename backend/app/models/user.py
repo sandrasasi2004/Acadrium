@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, DateTime, TypeDecorator
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from app.database.session import Base
 
@@ -49,6 +50,10 @@ class User(Base):
     semester = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    created_classrooms = relationship("Classroom", back_populates="faculty", cascade="all, delete-orphan")
+    memberships = relationship("ClassroomMember", back_populates="student", cascade="all, delete-orphan")
 
     def to_dict(self):
         return {

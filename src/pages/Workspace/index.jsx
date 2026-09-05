@@ -23,6 +23,7 @@ export default function Workspace() {
     myNotes, 
     isLoading,
     error,
+    showToast,
     uploadPrivateDoc, 
     deletePrivateDoc,
     addNote,
@@ -49,6 +50,14 @@ export default function Workspace() {
 
   // Document Viewer state
   const [viewingFile, setViewingFile] = useState(null);
+
+  const handleUploadClick = () => {
+    showToast('Workspace file upload will be available in Phase 4.', 'info');
+  };
+
+  const handlePreviewClick = (doc) => {
+    showToast('File preview will be available in Phase 4.', 'info');
+  };
 
   // File Upload Handlers
   const handleFileChange = (e) => {
@@ -159,8 +168,9 @@ export default function Workspace() {
 
         {activeTab === 'uploads' && (
           <button
-            onClick={() => setShowUploadModal(true)}
-            className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-indigo-700 transition-colors"
+            onClick={handleUploadClick}
+            className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-full bg-slate-400 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-500 transition-colors"
+            title="Uploads will be available in Phase 4"
           >
             <Plus className="h-4 w-4" /> Upload File
           </button>
@@ -212,7 +222,7 @@ export default function Workspace() {
               <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-xs">
                 <FolderUp className="mx-auto h-12 w-12 text-slate-300 mb-3" />
                 <h4 className="text-sm font-bold text-slate-700">No private documents uploaded</h4>
-                <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">Upload drafts, slides, or pictures. Visible strictly to you.</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">This feature will be available in Phase 4.</p>
               </div>
             ) : (
               <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs">
@@ -242,7 +252,7 @@ export default function Workspace() {
                               </div>
                               <div>
                                 <button
-                                  onClick={() => setViewingFile(doc)}
+                                  onClick={() => handlePreviewClick(doc)}
                                   className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
                                 >
                                   {doc.title}
@@ -255,7 +265,7 @@ export default function Workspace() {
                           <td className="px-6 py-4 text-slate-500">{doc.uploadedDate}</td>
                           <td className="px-6 py-4 text-right space-x-2">
                             <button 
-                              onClick={() => setViewingFile(doc)}
+                              onClick={() => handlePreviewClick(doc)}
                               className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
                               title="View Document"
                             >

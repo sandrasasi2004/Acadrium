@@ -3,7 +3,7 @@
  * Fully Integrated with FastAPI Backend & JWT Authentication
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
 
 /**
  * Helper to get Bearer Authorization headers from localStorage
@@ -71,11 +71,13 @@ async function fetchApi(endpoint, options = {}) {
 
 export async function login(credentials) {
   const payload = {
-    email: credentials.username || credentials.email,
-    username: credentials.username,
-    password: credentials.password,
-    role: credentials.role || 'student'
+    email: credentials.email || credentials.username,
+    username: credentials.username || credentials.email,
+    password: credentials.password
   };
+  if (credentials.role) {
+    payload.role = credentials.role;
+  }
 
   const res = await fetchApi('/auth/login', {
     method: 'POST',
@@ -136,14 +138,21 @@ export async function getProfile() {
 }
 
 // ==========================================
-// CLASSROOM APIs (Prepared for Phase 3)
+// CLASSROOM APIs (Phase 3 Backend Integration)
 // ==========================================
 
 export async function listClassrooms() {
   const res = await fetchApi('/classrooms', { method: 'GET' });
-  if (!res.success) {
-    return { success: true, data: [] };
-  }
+  return res;
+}
+
+export async function listFacultyClassrooms() {
+  const res = await fetchApi('/classrooms/my', { method: 'GET' });
+  return res;
+}
+
+export async function listStudentClassrooms() {
+  const res = await fetchApi('/classrooms/enrolled', { method: 'GET' });
   return res;
 }
 
@@ -152,33 +161,55 @@ export async function getClassroomDetails(classroomId) {
   return res;
 }
 
-export async function createClassroom(classroomData) {
-  const res = await fetchApi('/classrooms', {
-    method: 'POST',
-    body: JSON.stringify(classroomData),
-  });
-
-  if (!res.success) {
-    const newClassroom = {
-      id: `class_${Date.now()}`,
-      subject: classroomData.subject,
-      semester: classroomData.semester || 'Sem II',
-      courseCode: `MCA${Math.floor(10000 + Math.random() * 90000)}`,
-      inviteCode: Math.random().toString(36).substring(2, 12),
-      studentCount: 0,
-      facultyId: classroomData.facultyId || 'fac_user',
-      facultyName: classroomData.facultyName || 'Faculty User',
-      description: classroomData.description || ''
-    };
-    return { success: true, data: newClassroom };
-  }
+export async function getClassroomStudents(classroomId) {
+  const res = await fetchApi(`/classrooms/${classroomId}/students`, { method: 'GET' });
   return res;
 }
 
-export async function joinClassroom(inviteCode) {
+export async function createClassroom(classroomData) {
+  const payload = {
+    name: classroomData.name || classroomData.subject,
+    subject: classroomData.subject || classroomData.name,
+    subject_code: classroomData.subject_code || classroomData.courseCode || 'MCA',
+    courseCode: classroomData.courseCode || classroomData.subject_code || 'MCA',
+    semester: classroomData.semester || 'Semester III',
+    department: classroomData.department || 'Computer Applications'
+  };
+
+  const res = await fetchApi('/classrooms', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+  return res;
+}
+
+export async function joinClassroom(class_code) {
   const res = await fetchApi('/classrooms/join', {
     method: 'POST',
-    body: JSON.stringify({ inviteCode }),
+    body: JSON.stringify({ class_code, inviteCode: class_code }),
+  });
+  return res;
+}
+
+export async function leaveClassroom(classroomId) {
+  const res = await fetchApi(`/classrooms/${classroomId}/leave`, {
+    method: 'DELETE',
+  });
+  return res;
+}
+
+export async function deleteClassroom(classroomId) {
+  const res = await fetchApi(`/classrooms/${classroomId}`, {
+    method: 'DELETE',
+  });
+  return res;
+}
+
+export async function updateClassroom(classroomId, updateData) {
+  const res = await fetchApi(`/classrooms/${classroomId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updateData),
   });
   return res;
 }

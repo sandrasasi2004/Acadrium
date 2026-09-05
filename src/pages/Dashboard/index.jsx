@@ -1,115 +1,27 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import { useUser } from '../../components/common/UserContext';
 import { 
   FileText, 
   Megaphone, 
-  Plus, 
   ArrowRight, 
   Sparkles, 
-  CheckCircle2,
-  AlertCircle,
-  Eye,
-  FolderUp,
-  Megaphone as MegaphoneIcon
+  AlertCircle
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 export default function Dashboard() {
   const { 
     userRole, 
-    classrooms, 
     resources, 
     announcements,
     isLoading,
     error,
-    createClassroom,
-    addAnnouncement,
-    addResource
+    fetchClassrooms
   } = useUser();
 
-  const navigate = useNavigate();
-
-  // Modals for Faculty Admin
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newClassName, setNewClassName] = useState('');
-  const [newClassSem, setNewClassSem] = useState('Sem II');
-  const [newClassDesc, setNewClassDesc] = useState('');
-
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadTitle, setUploadTitle] = useState('');
-  const [uploadClassId, setUploadClassId] = useState(classrooms[0]?.id || '');
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [uploadSuccess, setUploadSuccess] = useState('');
-  const [uploadDescription, setUploadDescription] = useState('');
-
-  const [showPostModal, setShowPostModal] = useState(false);
-  const [postTitle, setPostTitle] = useState('');
-  const [postClassId, setPostClassId] = useState(classrooms[0]?.id || '');
-  const [postContent, setPostContent] = useState('');
-
-  // Handle operations
-  const handleCreateClass = async (e) => {
-    e.preventDefault();
-    if (!newClassName.trim()) return;
-    await createClassroom(newClassName, newClassSem, newClassDesc);
-    setShowCreateModal(false);
-    setNewClassName('');
-    setNewClassDesc('');
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-      if (!uploadTitle.trim()) {
-        setUploadTitle(file.name.replace(/\.[^/.]+$/, ""));
-      }
-    }
-  };
-
-  const getFileType = (file) => {
-    if (!file) return 'PDF';
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (['ppt', 'pptx'].includes(ext)) return 'PPT';
-    if (['doc', 'docx'].includes(ext)) return 'DOCX';
-    return 'PDF';
-  };
-
-  const getFileSizeString = (file) => {
-    if (!file) return '0 KB';
-    if (file.size > 1024 * 1024) {
-      return (file.size / (1024 * 1024)).toFixed(1) + ' MB';
-    }
-    return (file.size / 1024).toFixed(0) + ' KB';
-  };
-
-  const handleUploadResource = async (e) => {
-    e.preventDefault();
-    if (!uploadTitle.trim() || !selectedFile) return;
-
-    const calculatedType = getFileType(selectedFile);
-    const calculatedSize = getFileSizeString(selectedFile);
-
-    await addResource(uploadClassId || (classrooms[0]?.id || 'general'), uploadTitle, calculatedType, calculatedSize, selectedFile);
-    
-    setUploadSuccess('File uploaded successfully!');
-    setTimeout(() => {
-      setShowUploadModal(false);
-      setUploadTitle('');
-      setSelectedFile(null);
-      setUploadDescription('');
-      setUploadSuccess('');
-    }, 1500);
-  };
-
-  const handlePostAnnouncement = async (e) => {
-    e.preventDefault();
-    if (!postTitle.trim() || !postContent.trim()) return;
-    await addAnnouncement(postClassId || (classrooms[0]?.id || 'general'), postTitle, postContent);
-    setShowPostModal(false);
-    setPostTitle('');
-    setPostContent('');
-  };
+  useEffect(() => {
+    fetchClassrooms();
+  }, []);
 
   // Get data limits
   const recentResources = resources.slice(0, 3);
@@ -142,54 +54,6 @@ export default function Dashboard() {
         <div className="absolute right-0 bottom-0 top-0 hidden w-1/3 bg-radial-gradient from-white/10 to-transparent opacity-70 lg:block pointer-events-none"></div>
         <div className="absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-indigo-500/20 blur-xl pointer-events-none"></div>
       </div>
-
-      {/* FACULTY QUICK ACTIONS */}
-      {userRole === 'faculty' && (
-        <div>
-          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Faculty Actions</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <button
-              onClick={() => navigate('/classrooms')}
-              className="cursor-pointer flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-xs transition-all hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-indigo-50 hover:shadow-md group"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                <Eye className="h-5 w-5" />
-              </div>
-              <span className="mt-2.5 text-xs font-bold text-slate-700">View My Classrooms</span>
-            </button>
-
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="cursor-pointer flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-xs transition-all hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-indigo-50 hover:shadow-md group"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                <Plus className="h-5 w-5" />
-              </div>
-              <span className="mt-2.5 text-xs font-bold text-slate-700">Create Classroom</span>
-            </button>
-
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="cursor-pointer flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-xs transition-all hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-indigo-50 hover:shadow-md group"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                <FolderUp className="h-5 w-5" />
-              </div>
-              <span className="mt-2.5 text-xs font-bold text-slate-700">Upload Resource</span>
-            </button>
-
-            <button
-              onClick={() => setShowPostModal(true)}
-              className="cursor-pointer flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-xs transition-all hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-indigo-50 hover:shadow-md group"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                <MegaphoneIcon className="h-5 w-5" />
-              </div>
-              <span className="mt-2.5 text-xs font-bold text-slate-700">Post Announcement</span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* FEED SECTIONS */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -300,209 +164,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* MODALS */}
-      {/* Create Classroom */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
-            <h3 className="text-base font-bold text-slate-800">Create Classroom</h3>
-            <form onSubmit={handleCreateClass} className="mt-4 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Subject Name :</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Database Management System"
-                  value={newClassName}
-                  onChange={(e) => setNewClassName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Semester :</label>
-                <select
-                  value={newClassSem}
-                  onChange={(e) => setNewClassSem(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
-                >
-                  <option value="Sem I">Sem I</option>
-                  <option value="Sem II">Sem II</option>
-                  <option value="Sem III">Sem III</option>
-                  <option value="Sem IV">Sem IV</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description :</label>
-                <textarea
-                  placeholder="Classroom course overview..."
-                  value={newClassDesc}
-                  onChange={(e) => setNewClassDesc(e.target.value)}
-                  rows="3"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 resize-none"
-                />
-              </div>
-              <div className="flex gap-2 justify-end pt-2">
-                <button type="button" onClick={() => setShowCreateModal(false)} className="rounded-xl px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100">Cancel</button>
-                <button type="submit" className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-700">Create</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Upload Resource */}
-      {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
-            <h3 className="text-base font-bold text-slate-800">Upload Classroom Resource</h3>
-            
-            {uploadSuccess && (
-              <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 border border-emerald-200 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                <span>{uploadSuccess}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleUploadResource} className="mt-4 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Select Classroom :</label>
-                <select
-                  value={uploadClassId}
-                  onChange={(e) => setUploadClassId(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
-                >
-                  {classrooms.length === 0 ? (
-                    <option value="general">General Classroom</option>
-                  ) : (
-                    classrooms.map(c => (
-                      <option key={c.id} value={c.id}>{c.subject}</option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Browse File :</label>
-                <div className="flex flex-col gap-2">
-                  <input
-                    type="file"
-                    required
-                    id="faculty-file-input"
-                    onChange={handleFileChange}
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.ppt,.pptx"
-                  />
-                  <label
-                    htmlFor="faculty-file-input"
-                    className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/20 py-4 text-center text-xs font-bold text-indigo-600 hover:bg-indigo-50/50 hover:border-indigo-400 transition-colors"
-                  >
-                    <Sparkles className="h-4 w-4 text-indigo-500" />
-                    {selectedFile ? 'Change Selected File' : 'Choose File / Browse Files'}
-                  </label>
-
-                  {selectedFile && (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left space-y-1 text-[11px] font-semibold text-slate-600">
-                      <p className="font-bold text-slate-800 truncate">File: {selectedFile.name}</p>
-                      <p>Detected Format: <span className="font-bold text-indigo-600">{getFileType(selectedFile)}</span></p>
-                      <p>File Size: <span className="font-bold text-indigo-600">{getFileSizeString(selectedFile)}</span></p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Resource Title :</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Resource Title (Auto-populated from file name)"
-                  value={uploadTitle}
-                  onChange={(e) => setUploadTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Optional Description :</label>
-                <textarea
-                  placeholder="Provide short details about the resource..."
-                  value={uploadDescription}
-                  onChange={(e) => setUploadDescription(e.target.value)}
-                  rows="2"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 resize-none"
-                />
-              </div>
-
-              <div className="flex gap-2 justify-end pt-2">
-                <button type="button" onClick={() => {
-                  setShowUploadModal(false);
-                  setUploadTitle('');
-                  setSelectedFile(null);
-                  setUploadDescription('');
-                  setUploadSuccess('');
-                }} className="rounded-xl px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100">Cancel</button>
-                <button type="submit" disabled={!selectedFile || !uploadTitle.trim()} className={`rounded-xl px-5 py-2 text-xs font-bold text-white transition-colors ${
-                  selectedFile && uploadTitle.trim() ? 'bg-indigo-600 hover:bg-indigo-700 cursor-pointer' : 'bg-slate-300 cursor-not-allowed'
-                }`}>Upload</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Post Announcement */}
-      {showPostModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
-            <h3 className="text-base font-bold text-slate-800">Post Announcement</h3>
-            <form onSubmit={handlePostAnnouncement} className="mt-4 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Select Classroom Board :</label>
-                <select
-                  value={postClassId}
-                  onChange={(e) => setPostClassId(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
-                >
-                  {classrooms.length === 0 ? (
-                    <option value="general">General Course Board</option>
-                  ) : (
-                    classrooms.map(c => (
-                      <option key={c.id} value={c.id}>{c.subject}</option>
-                    ))
-                  )}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Announcement Title :</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Schedule for DBMS Lab shifted"
-                  value={postTitle}
-                  onChange={(e) => setPostTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Content Details :</label>
-                <textarea
-                  required
-                  placeholder="Type description content..."
-                  value={postContent}
-                  onChange={(e) => setPostContent(e.target.value)}
-                  rows="4"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 resize-none"
-                />
-              </div>
-              <div className="flex gap-2 justify-end pt-2">
-                <button type="button" onClick={() => setShowPostModal(false)} className="rounded-xl px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100">Cancel</button>
-                <button type="submit" className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-700">Publish</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
+

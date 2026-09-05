@@ -3,13 +3,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useUser } from '../../components/common/UserContext';
 import heroImg from '../../assets/login_hero.svg';
 import logo from '../../assets/logo.svg';
-import { User, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
   const { login } = useUser();
   const navigate = useNavigate();
-  const [role, setRole] = useState('student'); // 'student' or 'faculty'
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -17,13 +16,13 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!username.trim() || !password.trim()) {
-      setError('Please enter both username and password');
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter both email and password');
       return;
     }
     setError('');
     setIsSubmitting(true);
-    const result = await login(role, username, password);
+    const result = await login(email, password);
     setIsSubmitting(false);
     if (result.success) {
       navigate('/dashboard');
@@ -68,52 +67,21 @@ export default function Login() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Role Selection */}
-              <div>
-                <label className="mb-2 block text-xs font-bold text-slate-600 uppercase tracking-wider">
-                  Select User Role
-                </label>
-                <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1 border border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => setRole('student')}
-                    className={`cursor-pointer flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition-all ${
-                      role === 'student'
-                        ? 'bg-white text-indigo-700 shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    Student
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('faculty')}
-                    className={`cursor-pointer flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition-all ${
-                      role === 'faculty'
-                        ? 'bg-white text-indigo-700 shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    Faculty
-                  </button>
-                </div>
-              </div>
-
-              {/* Username Input */}
+              {/* Email Input */}
               <div>
                 <label className="mb-1.5 block text-xs font-bold text-slate-600 uppercase tracking-wider">
-                  Username :
+                  Email :
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
-                    <User className="h-4.5 w-4.5" />
+                    <Mail className="h-4.5 w-4.5" />
                   </span>
                   <input
-                    type="text"
+                    type="email"
                     required
-                    placeholder="Enter your username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter your email address"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-3 pl-11 pr-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-hidden transition-all shadow-xs"
                   />
                 </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUser } from '../../components/common/UserContext';
 import { BookOpen, Users, Plus, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -9,9 +9,14 @@ export default function Classrooms() {
     classrooms, 
     isLoading,
     error,
+    fetchClassrooms,
     createClassroom, 
     joinClassroom 
   } = useUser();
+
+  useEffect(() => {
+    fetchClassrooms();
+  }, []);
 
   // Dialog State
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -20,6 +25,7 @@ export default function Classrooms() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newClassName, setNewClassName] = useState('');
+  const [newSubjectCode, setNewSubjectCode] = useState('');
   const [newClassSem, setNewClassSem] = useState('Sem II');
   const [newClassDesc, setNewClassDesc] = useState('');
 
@@ -44,9 +50,10 @@ export default function Classrooms() {
   const handleCreateClass = async (e) => {
     e.preventDefault();
     if (!newClassName.trim()) return;
-    await createClassroom(newClassName, newClassSem, newClassDesc);
+    await createClassroom(newClassName, newClassSem, newClassDesc, newSubjectCode);
     setShowCreateModal(false);
     setNewClassName('');
+    setNewSubjectCode('');
     setNewClassDesc('');
   };
 
@@ -238,16 +245,27 @@ export default function Classrooms() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Subject Code :</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. MCA401"
+                    value={newSubjectCode}
+                    onChange={(e) => setNewSubjectCode(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+                <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Semester :</label>
                   <select
                     value={newClassSem}
                     onChange={(e) => setNewClassSem(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
                   >
-                    <option value="Sem I">Sem I</option>
-                    <option value="Sem II">Sem II</option>
-                    <option value="Sem III">Sem III</option>
-                    <option value="Sem IV">Sem IV</option>
+                    <option value="Semester I">Semester I</option>
+                    <option value="Semester II">Semester II</option>
+                    <option value="Semester III">Semester III</option>
+                    <option value="Semester IV">Semester IV</option>
                   </select>
                 </div>
               </div>
