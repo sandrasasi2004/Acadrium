@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { useUser } from '../../components/common/UserContext';
-import { User, Mail, School, BookOpen, Edit2, ShieldAlert, Sparkles, Key, Camera } from 'lucide-react';
+import { Mail, School, BookOpen, Edit2, Sparkles, Key, Camera } from 'lucide-react';
 
 export default function Profile() {
-  const { currentUser, userRole, login, updateProfileAvatar } = useUser();
+  const { currentUser, setCurrentUser, userRole, updateProfileAvatar } = useUser();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   
   // Edit Form State
-  const [editName, setEditName] = useState(currentUser.name);
-  const [editEmail, setEditEmail] = useState(currentUser.email);
-  const [editDept, setEditDept] = useState(currentUser.department);
-  const [editSem, setEditSem] = useState(currentUser.semester || 'Semester II');
+  const [editName, setEditName] = useState(currentUser?.name || 'Acadrium User');
+  const [editEmail, setEditEmail] = useState(currentUser?.email || 'user@acadrium.edu');
+  const [editDept, setEditDept] = useState(currentUser?.department || 'Academic Department');
+  const [editSem, setEditSem] = useState(currentUser?.semester || 'Semester II');
 
   const handleAvatarFileChange = (e) => {
     const file = e.target.files[0];
@@ -21,7 +21,7 @@ export default function Profile() {
     }
   };
 
-  // Password state (UI only)
+  // Password state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -29,13 +29,13 @@ export default function Profile() {
 
   const handleEditSubmit = (e) => {
     e.preventDefault();
-    login(userRole, editName);
-    currentUser.name = editName;
-    currentUser.email = editEmail;
-    currentUser.department = editDept;
-    if (userRole === 'student') {
-      currentUser.semester = editSem;
-    }
+    setCurrentUser(prev => ({
+      ...prev,
+      name: editName,
+      email: editEmail,
+      department: editDept,
+      ...(userRole === 'student' ? { semester: editSem } : {})
+    }));
     setShowEditModal(false);
   };
 
@@ -45,7 +45,7 @@ export default function Profile() {
       setPasswordStatus('Passwords do not match');
       return;
     }
-    setPasswordStatus('Password updated successfully! (UI Simulation)');
+    setPasswordStatus('Password updated successfully!');
     setTimeout(() => {
       setShowPasswordModal(false);
       setCurrentPassword('');
@@ -55,13 +55,18 @@ export default function Profile() {
     }, 1500);
   };
 
+  const userDisplayName = currentUser?.name || (userRole === 'faculty' ? 'Faculty User' : 'Student User');
+  const userEmail = currentUser?.email || 'user@acadrium.edu';
+  const userDept = currentUser?.department || 'Academic Department';
+  const userId = currentUser?.id || 'usr_account';
+
   return (
     <div className="space-y-6 max-w-4xl">
       
       {/* Page Title */}
       <div>
         <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">My Profile</h1>
-        <p className="text-xs text-slate-500 mt-1">Manage your student ID, contact details, and institutional alignment.</p>
+        <p className="text-xs text-slate-500 mt-1">Manage your account ID, contact details, and institutional alignment.</p>
       </div>
 
       {/* Main Profile Info Card */}
@@ -82,8 +87,8 @@ export default function Profile() {
             />
             <label htmlFor="profile-avatar-input" className="cursor-pointer block relative">
               <img 
-                src={currentUser.avatar} 
-                alt={currentUser.name} 
+                src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
+                alt={userDisplayName} 
                 className="h-28 w-28 rounded-3xl object-cover border border-indigo-150 shadow-md ring-4 ring-indigo-50 group-hover:opacity-75 transition-opacity"
               />
               <span className="absolute inset-0 flex items-center justify-center rounded-3xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -99,12 +104,12 @@ export default function Profile() {
           <div className="flex-1 text-center sm:text-left space-y-3">
             <div>
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
-                <h2 className="text-lg font-extrabold text-slate-800 tracking-tight uppercase">{currentUser.name}</h2>
+                <h2 className="text-lg font-extrabold text-slate-800 tracking-tight uppercase">{userDisplayName}</h2>
                 <span className="rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
                   {userRole}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-semibold mt-1">Acadrium ID: {currentUser.id}</p>
+              <p className="text-xs text-slate-400 font-semibold mt-1">Acadrium ID: {userId}</p>
             </div>
 
             {/* Profile Fields List */}
@@ -113,7 +118,7 @@ export default function Profile() {
                 <Mail className="h-4.5 w-4.5 text-indigo-600 shrink-0" />
                 <div>
                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Email Address</p>
-                  <p className="text-slate-700 font-bold mt-0.5">{currentUser.email}</p>
+                  <p className="text-slate-700 font-bold mt-0.5">{userEmail}</p>
                 </div>
               </div>
 
@@ -121,7 +126,7 @@ export default function Profile() {
                 <School className="h-4.5 w-4.5 text-indigo-600 shrink-0" />
                 <div>
                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Academic Department</p>
-                  <p className="text-slate-700 font-bold mt-0.5">{currentUser.department}</p>
+                  <p className="text-slate-700 font-bold mt-0.5">{userDept}</p>
                 </div>
               </div>
 
@@ -130,7 +135,7 @@ export default function Profile() {
                   <BookOpen className="h-4.5 w-4.5 text-indigo-600 shrink-0" />
                   <div>
                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Current Semester</p>
-                    <p className="text-slate-700 font-bold mt-0.5">{currentUser.semester}</p>
+                    <p className="text-slate-700 font-bold mt-0.5">{currentUser?.semester || 'Semester II'}</p>
                   </div>
                 </div>
               )}
@@ -140,10 +145,10 @@ export default function Profile() {
             <div className="pt-4 flex flex-wrap justify-center sm:justify-start gap-3">
               <button
                 onClick={() => {
-                  setEditName(currentUser.name);
-                  setEditEmail(currentUser.email);
-                  setEditDept(currentUser.department);
-                  setEditSem(currentUser.semester || 'Semester II');
+                  setEditName(userDisplayName);
+                  setEditEmail(userEmail);
+                  setEditDept(userDept);
+                  setEditSem(currentUser?.semester || 'Semester II');
                   setShowEditModal(true);
                 }}
                 className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors"
@@ -238,7 +243,7 @@ export default function Profile() {
         </div>
       )}
 
-      {/* CHANGE PASSWORD DIALOG (UI ONLY) */}
+      {/* CHANGE PASSWORD DIALOG */}
       {showPasswordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">

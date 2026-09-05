@@ -3,11 +3,9 @@ import { useUser } from '../../components/common/UserContext';
 import { 
   FileText, 
   Megaphone, 
-  BookOpen, 
   Plus, 
   ArrowRight, 
-  Users, 
-  Sparkles,
+  Sparkles, 
   CheckCircle2,
   AlertCircle,
   Eye,
@@ -19,10 +17,11 @@ import { Link, useNavigate } from 'react-router-dom';
 export default function Dashboard() {
   const { 
     userRole, 
-    currentUser, 
     classrooms, 
     resources, 
     announcements,
+    isLoading,
+    error,
     createClassroom,
     addAnnouncement,
     addResource
@@ -49,10 +48,10 @@ export default function Dashboard() {
   const [postContent, setPostContent] = useState('');
 
   // Handle operations
-  const handleCreateClass = (e) => {
+  const handleCreateClass = async (e) => {
     e.preventDefault();
     if (!newClassName.trim()) return;
-    createClassroom(newClassName, newClassSem, newClassDesc);
+    await createClassroom(newClassName, newClassSem, newClassDesc);
     setShowCreateModal(false);
     setNewClassName('');
     setNewClassDesc('');
@@ -63,7 +62,7 @@ export default function Dashboard() {
     if (file) {
       setSelectedFile(file);
       if (!uploadTitle.trim()) {
-        setUploadTitle(file.name.replace(/\.[^/.]+$/, "")); // strip extension
+        setUploadTitle(file.name.replace(/\.[^/.]+$/, ""));
       }
     }
   };
@@ -84,14 +83,14 @@ export default function Dashboard() {
     return (file.size / 1024).toFixed(0) + ' KB';
   };
 
-  const handleUploadResource = (e) => {
+  const handleUploadResource = async (e) => {
     e.preventDefault();
     if (!uploadTitle.trim() || !selectedFile) return;
 
     const calculatedType = getFileType(selectedFile);
     const calculatedSize = getFileSizeString(selectedFile);
 
-    addResource(uploadClassId, uploadTitle, calculatedType, calculatedSize);
+    await addResource(uploadClassId || (classrooms[0]?.id || 'general'), uploadTitle, calculatedType, calculatedSize, selectedFile);
     
     setUploadSuccess('File uploaded successfully!');
     setTimeout(() => {
@@ -103,10 +102,10 @@ export default function Dashboard() {
     }, 1500);
   };
 
-  const handlePostAnnouncement = (e) => {
+  const handlePostAnnouncement = async (e) => {
     e.preventDefault();
     if (!postTitle.trim() || !postContent.trim()) return;
-    addAnnouncement(postClassId, postTitle, postContent);
+    await addAnnouncement(postClassId || (classrooms[0]?.id || 'general'), postTitle, postContent);
     setShowPostModal(false);
     setPostTitle('');
     setPostContent('');
@@ -116,29 +115,36 @@ export default function Dashboard() {
   const recentResources = resources.slice(0, 3);
   const recentAnnouncements = announcements.slice(0, 3);
 
-  // Dynamic Dashboard Render
-  if (userRole === 'faculty') {
-    return (
-      <div className="space-y-6">
-        
-        {/* Welcome Banner */}
-        <div className="rounded-3xl bg-linear-to-r from-indigo-600 via-indigo-700 to-indigo-800 p-6 md:p-8 text-white shadow-md relative overflow-hidden">
-          <div className="relative z-10 max-w-lg">
-            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/30 px-3 py-1 text-xs font-bold text-indigo-100 uppercase tracking-wider backdrop-blur-xs">
-              <Sparkles className="h-3 w-3" /> Acadrium Faculty Dashboard
-            </span>
-            <h1 className="mt-4 text-2xl md:text-3xl font-extrabold tracking-tight">
-              Hello {currentUser.name} 👋
-            </h1>
-            <p className="mt-2 text-sm text-indigo-100/90 leading-relaxed font-medium">
-              Academic portal for managing classroom resources, student lists, and announcements.
-            </p>
-          </div>
-          <div className="absolute right-0 bottom-0 top-0 hidden w-1/3 bg-radial-gradient from-white/10 to-transparent opacity-70 lg:block pointer-events-none"></div>
-          <div className="absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-indigo-500/20 blur-xl pointer-events-none"></div>
+  return (
+    <div className="space-y-6">
+      
+      {/* Error Alert Banner */}
+      {error && (
+        <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4 text-xs text-rose-700 font-semibold flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
         </div>
+      )}
 
-        {/* FACULTY QUICK ACTIONS */}
+      {/* Welcome Banner */}
+      <div className="rounded-3xl bg-linear-to-r from-indigo-600 via-indigo-700 to-indigo-800 p-6 md:p-8 text-white shadow-md relative overflow-hidden">
+        <div className="relative z-10 max-w-lg">
+          <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/30 px-3 py-1 text-xs font-bold text-indigo-100 uppercase tracking-wider backdrop-blur-xs">
+            <Sparkles className="h-3 w-3" /> Acadrium Portal
+          </span>
+          <h1 className="mt-4 text-2xl md:text-3xl font-extrabold tracking-tight">
+            {userRole === 'faculty' ? 'Faculty Dashboard' : 'Student Dashboard'}
+          </h1>
+          <p className="mt-2 text-sm text-indigo-100/90 leading-relaxed font-medium">
+            Welcome to Acadrium. Your academic companion and document management system.
+          </p>
+        </div>
+        <div className="absolute right-0 bottom-0 top-0 hidden w-1/3 bg-radial-gradient from-white/10 to-transparent opacity-70 lg:block pointer-events-none"></div>
+        <div className="absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-indigo-500/20 blur-xl pointer-events-none"></div>
+      </div>
+
+      {/* FACULTY QUICK ACTIONS */}
+      {userRole === 'faculty' && (
         <div>
           <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Faculty Actions</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -183,21 +189,45 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+      )}
 
-        {/* FEED SECTIONS */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Recent Resources */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">Recent Classroom Uploads</h3>
-                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Faculty course uploads</p>
-              </div>
-              <Link to="/resources" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-                View all <ArrowRight className="h-3 w-3" />
-              </Link>
+      {/* FEED SECTIONS */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        
+        {/* Recent Resources */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">Recent Classroom Uploads</h3>
+              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Faculty course uploads</p>
             </div>
+            <Link to="/resources" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+              View all <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
 
+          {isLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="animate-pulse flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-slate-200"></div>
+                    <div className="space-y-1.5">
+                      <div className="h-3 w-32 rounded-md bg-slate-200"></div>
+                      <div className="h-2.5 w-24 rounded-md bg-slate-200"></div>
+                    </div>
+                  </div>
+                  <div className="h-2.5 w-12 rounded-md bg-slate-200"></div>
+                </div>
+              ))}
+            </div>
+          ) : recentResources.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
+              <FileText className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+              <p className="text-xs font-bold text-slate-600">No classroom uploads yet</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Uploaded course materials will appear here once added.</p>
+            </div>
+          ) : (
             <div className="space-y-3">
               {recentResources.map((res) => (
                 <div key={res.id} className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-3">
@@ -218,20 +248,40 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+
+        {/* Recent Announcements */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">Recent Announcements</h3>
+              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Class notices & updates</p>
+            </div>
+            <Link to="/announcements" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+              View all <ArrowRight className="h-3 w-3" />
+            </Link>
           </div>
 
-          {/* Recent Announcements */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">Recent Announcements</h3>
-                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Class notices updates</p>
-              </div>
-              <Link to="/announcements" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-                View all <ArrowRight className="h-3 w-3" />
-              </Link>
+          {isLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="animate-pulse flex items-start gap-3">
+                  <div className="h-4.5 w-4.5 rounded-full bg-slate-200 shrink-0 mt-1"></div>
+                  <div className="space-y-2 flex-1">
+                    <div className="h-3 w-40 rounded-md bg-slate-200"></div>
+                    <div className="h-2.5 w-full rounded-md bg-slate-200"></div>
+                  </div>
+                </div>
+              ))}
             </div>
-
+          ) : recentAnnouncements.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
+              <Megaphone className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+              <p className="text-xs font-bold text-slate-600">No announcements posted yet</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Class notices will appear here once published by faculty.</p>
+            </div>
+          ) : (
             <div className="space-y-4">
               {recentAnnouncements.map((ann) => (
                 <div key={ann.id} className="relative pl-6 before:absolute before:left-2 before:top-2 before:bottom-0 before:w-0.5 before:bg-indigo-100 last:before:hidden pb-1">
@@ -246,296 +296,212 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-          </div>
+          )}
         </div>
-
-        {/* MODALS */}
-        {/* Create Classroom */}
-        {showCreateModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
-              <h3 className="text-base font-bold text-slate-800">Create Classroom</h3>
-              <form onSubmit={handleCreateClass} className="mt-4 space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Subject Name :</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Database Management System"
-                    value={newClassName}
-                    onChange={(e) => setNewClassName(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Semester :</label>
-                  <select
-                    value={newClassSem}
-                    onChange={(e) => setNewClassSem(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
-                  >
-                    <option value="Sem I">Sem I</option>
-                    <option value="Sem II">Sem II</option>
-                    <option value="Sem III">Sem III</option>
-                    <option value="Sem IV">Sem IV</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description :</label>
-                  <textarea
-                    placeholder="Classroom course overview..."
-                    value={newClassDesc}
-                    onChange={(e) => setNewClassDesc(e.target.value)}
-                    rows="3"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 resize-none"
-                  />
-                </div>
-                <div className="flex gap-2 justify-end pt-2">
-                  <button type="button" onClick={() => setShowCreateModal(false)} className="rounded-xl px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100">Cancel</button>
-                  <button type="submit" className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-700">Create</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Upload Resource */}
-        {showUploadModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
-              <h3 className="text-base font-bold text-slate-800">Upload Classroom Resource</h3>
-              
-              {uploadSuccess && (
-                <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 border border-emerald-200 flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span>{uploadSuccess}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleUploadResource} className="mt-4 space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Select Classroom :</label>
-                  <select
-                    value={uploadClassId}
-                    onChange={(e) => setUploadClassId(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
-                  >
-                    {classrooms.map(c => (
-                      <option key={c.id} value={c.id}>{c.subject}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Browse File :</label>
-                  <div className="flex flex-col gap-2">
-                    <input
-                      type="file"
-                      required
-                      id="faculty-file-input"
-                      onChange={handleFileChange}
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.ppt,.pptx"
-                    />
-                    <label
-                      htmlFor="faculty-file-input"
-                      className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/20 py-4 text-center text-xs font-bold text-indigo-600 hover:bg-indigo-50/50 hover:border-indigo-400 transition-colors"
-                    >
-                      <Sparkles className="h-4 w-4 text-indigo-500" />
-                      {selectedFile ? 'Change Selected File' : 'Choose File / Browse Files'}
-                    </label>
-
-                    {selectedFile && (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left space-y-1 text-[11px] font-semibold text-slate-650">
-                        <p className="font-bold text-slate-850 truncate">File: {selectedFile.name}</p>
-                        <p>Detected Format: <span className="font-bold text-indigo-650">{getFileType(selectedFile)}</span></p>
-                        <p>File Size: <span className="font-bold text-indigo-650">{getFileSizeString(selectedFile)}</span></p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Resource Title :</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Resource Title (Auto-populated from file name)"
-                    value={uploadTitle}
-                    onChange={(e) => setUploadTitle(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Optional Description :</label>
-                  <textarea
-                    placeholder="Provide short details about the resource..."
-                    value={uploadDescription}
-                    onChange={(e) => setUploadDescription(e.target.value)}
-                    rows="2"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 resize-none"
-                  />
-                </div>
-
-                <div className="flex gap-2 justify-end pt-2">
-                  <button type="button" onClick={() => {
-                    setShowUploadModal(false);
-                    setUploadTitle('');
-                    setSelectedFile(null);
-                    setUploadDescription('');
-                    setUploadSuccess('');
-                  }} className="rounded-xl px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100">Cancel</button>
-                  <button type="submit" disabled={!selectedFile || !uploadTitle.trim()} className={`rounded-xl px-5 py-2 text-xs font-bold text-white transition-colors ${
-                    selectedFile && uploadTitle.trim() ? 'bg-indigo-600 hover:bg-indigo-700 cursor-pointer' : 'bg-slate-300 cursor-not-allowed'
-                  }`}>Upload</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Post Announcement */}
-        {showPostModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
-              <h3 className="text-base font-bold text-slate-800">Post Announcement</h3>
-              <form onSubmit={handlePostAnnouncement} className="mt-4 space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Select Classroom Board :</label>
-                  <select
-                    value={postClassId}
-                    onChange={(e) => setPostClassId(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
-                  >
-                    {classrooms.map(c => (
-                      <option key={c.id} value={c.id}>{c.subject}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Announcement Title :</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Schedule for DBMS Lab shifted"
-                    value={postTitle}
-                    onChange={(e) => setPostTitle(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Content Details :</label>
-                  <textarea
-                    required
-                    placeholder="Type description content..."
-                    value={postContent}
-                    onChange={(e) => setPostContent(e.target.value)}
-                    rows="4"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 resize-none"
-                  />
-                </div>
-                <div className="flex gap-2 justify-end pt-2">
-                  <button type="button" onClick={() => setShowPostModal(false)} className="rounded-xl px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100">Cancel</button>
-                  <button type="submit" className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-700">Publish</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-      </div>
-    );
-  }
-
-  // STUDENT VIEW (Simplified)
-  return (
-    <div className="space-y-6">
-      
-      {/* Welcome Banner Card */}
-      <div className="rounded-3xl bg-linear-to-r from-indigo-600 via-indigo-700 to-indigo-800 p-6 md:p-8 text-white shadow-md relative overflow-hidden">
-        <div className="relative z-10 max-w-lg">
-          <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/30 px-3 py-1 text-xs font-bold text-indigo-100 uppercase tracking-wider backdrop-blur-xs">
-            <Sparkles className="h-3 w-3" /> Acadrium Active Companion
-          </span>
-          <h1 className="mt-4 text-2xl md:text-3xl font-extrabold tracking-tight">
-            Hello {currentUser.name.split(' ')[0]} 👋
-          </h1>
-          <p className="mt-2 text-sm text-indigo-100/90 leading-relaxed font-medium">
-            Welcome back to Acadrium. Your AI-powered academic memory and document management companion.
-          </p>
-        </div>
-        <div className="absolute right-0 bottom-0 top-0 hidden w-1/3 bg-radial-gradient from-white/10 to-transparent opacity-70 lg:block pointer-events-none"></div>
-        <div className="absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-indigo-500/20 blur-xl pointer-events-none"></div>
       </div>
 
-      {/* Simplified Feed Grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent Classroom Uploads (Classroom resources uploaded by Faculty) */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">Recent Classroom Uploads</h3>
-              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Faculty course uploads</p>
-            </div>
-            <Link to="/resources" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-              View all <ArrowRight className="h-3 w-3" />
-            </Link>
-          </div>
-
-          <div className="space-y-3">
-            {recentResources.map((res) => (
-              <div 
-                key={res.id} 
-                className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-3 hover:border-slate-200 transition-all hover:bg-slate-50"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl font-black text-xs ${
-                    res.type === 'PDF' ? 'bg-red-50 text-red-600' :
-                    res.type === 'PPT' ? 'bg-orange-50 text-orange-600' :
-                    'bg-blue-50 text-blue-600'
-                  }`}>
-                    {res.type}
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800">{res.title}</h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{res.classroomName} • Uploaded by {res.uploadedBy}</p>
-                  </div>
-                </div>
-                <span className="text-[10px] text-slate-500 font-semibold">{res.uploadedDate}</span>
+      {/* MODALS */}
+      {/* Create Classroom */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-base font-bold text-slate-800">Create Classroom</h3>
+            <form onSubmit={handleCreateClass} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Subject Name :</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Database Management System"
+                  value={newClassName}
+                  onChange={(e) => setNewClassName(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
+                />
               </div>
-            ))}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Semester :</label>
+                <select
+                  value={newClassSem}
+                  onChange={(e) => setNewClassSem(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
+                >
+                  <option value="Sem I">Sem I</option>
+                  <option value="Sem II">Sem II</option>
+                  <option value="Sem III">Sem III</option>
+                  <option value="Sem IV">Sem IV</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description :</label>
+                <textarea
+                  placeholder="Classroom course overview..."
+                  value={newClassDesc}
+                  onChange={(e) => setNewClassDesc(e.target.value)}
+                  rows="3"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 resize-none"
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button type="button" onClick={() => setShowCreateModal(false)} className="rounded-xl px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100">Cancel</button>
+                <button type="submit" className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-700">Create</button>
+              </div>
+            </form>
           </div>
         </div>
+      )}
 
-        {/* Recent Announcements */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">Recent Announcements</h3>
-              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Important course board updates</p>
-            </div>
-            <Link to="/announcements" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-              View all <ArrowRight className="h-3 w-3" />
-            </Link>
-          </div>
+      {/* Upload Resource */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-base font-bold text-slate-800">Upload Classroom Resource</h3>
+            
+            {uploadSuccess && (
+              <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 border border-emerald-200 flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>{uploadSuccess}</span>
+              </div>
+            )}
 
-          <div className="space-y-4">
-            {recentAnnouncements.map((ann) => (
-              <div key={ann.id} className="relative pl-6 before:absolute before:left-2 before:top-2 before:bottom-0 before:w-0.5 before:bg-indigo-100 last:before:hidden pb-1">
-                <div className="absolute left-0 top-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-                  <Megaphone className="h-2.5 w-2.5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-indigo-900">{ann.title}</h4>
-                  <p className="text-[10px] font-semibold text-indigo-500 mt-0.5">{ann.classroomName} • {ann.date}</p>
-                  <p className="text-xs text-slate-600 mt-1.5 line-clamp-2 leading-relaxed">{ann.content}</p>
+            <form onSubmit={handleUploadResource} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Select Classroom :</label>
+                <select
+                  value={uploadClassId}
+                  onChange={(e) => setUploadClassId(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
+                >
+                  {classrooms.length === 0 ? (
+                    <option value="general">General Classroom</option>
+                  ) : (
+                    classrooms.map(c => (
+                      <option key={c.id} value={c.id}>{c.subject}</option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Browse File :</label>
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="file"
+                    required
+                    id="faculty-file-input"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.ppt,.pptx"
+                  />
+                  <label
+                    htmlFor="faculty-file-input"
+                    className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/20 py-4 text-center text-xs font-bold text-indigo-600 hover:bg-indigo-50/50 hover:border-indigo-400 transition-colors"
+                  >
+                    <Sparkles className="h-4 w-4 text-indigo-500" />
+                    {selectedFile ? 'Change Selected File' : 'Choose File / Browse Files'}
+                  </label>
+
+                  {selectedFile && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left space-y-1 text-[11px] font-semibold text-slate-600">
+                      <p className="font-bold text-slate-800 truncate">File: {selectedFile.name}</p>
+                      <p>Detected Format: <span className="font-bold text-indigo-600">{getFileType(selectedFile)}</span></p>
+                      <p>File Size: <span className="font-bold text-indigo-600">{getFileSizeString(selectedFile)}</span></p>
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Resource Title :</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Resource Title (Auto-populated from file name)"
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Optional Description :</label>
+                <textarea
+                  placeholder="Provide short details about the resource..."
+                  value={uploadDescription}
+                  onChange={(e) => setUploadDescription(e.target.value)}
+                  rows="2"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <button type="button" onClick={() => {
+                  setShowUploadModal(false);
+                  setUploadTitle('');
+                  setSelectedFile(null);
+                  setUploadDescription('');
+                  setUploadSuccess('');
+                }} className="rounded-xl px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100">Cancel</button>
+                <button type="submit" disabled={!selectedFile || !uploadTitle.trim()} className={`rounded-xl px-5 py-2 text-xs font-bold text-white transition-colors ${
+                  selectedFile && uploadTitle.trim() ? 'bg-indigo-600 hover:bg-indigo-700 cursor-pointer' : 'bg-slate-300 cursor-not-allowed'
+                }`}>Upload</button>
+              </div>
+            </form>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Post Announcement */}
+      {showPostModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-base font-bold text-slate-800">Post Announcement</h3>
+            <form onSubmit={handlePostAnnouncement} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Select Classroom Board :</label>
+                <select
+                  value={postClassId}
+                  onChange={(e) => setPostClassId(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
+                >
+                  {classrooms.length === 0 ? (
+                    <option value="general">General Course Board</option>
+                  ) : (
+                    classrooms.map(c => (
+                      <option key={c.id} value={c.id}>{c.subject}</option>
+                    ))
+                  )}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Announcement Title :</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Schedule for DBMS Lab shifted"
+                  value={postTitle}
+                  onChange={(e) => setPostTitle(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Content Details :</label>
+                <textarea
+                  required
+                  placeholder="Type description content..."
+                  value={postContent}
+                  onChange={(e) => setPostContent(e.target.value)}
+                  rows="4"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 resize-none"
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button type="button" onClick={() => setShowPostModal(false)} className="rounded-xl px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100">Cancel</button>
+                <button type="submit" className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-700">Publish</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

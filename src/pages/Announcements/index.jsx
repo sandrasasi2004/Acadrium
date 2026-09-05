@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useUser } from '../../components/common/UserContext';
-import { Megaphone, Trash2, Plus, Search, Filter, Sparkles } from 'lucide-react';
+import { Megaphone, Trash2, Plus, Search, Filter, AlertCircle } from 'lucide-react';
 
 export default function Announcements() {
   const { 
     userRole, 
     announcements, 
     classrooms, 
+    isLoading,
+    error,
     addAnnouncement,
     deleteAnnouncement
   } = useUser();
@@ -18,14 +20,14 @@ export default function Announcements() {
   // Modal State
   const [showAddAnnModal, setShowAddAnnModal] = useState(false);
   const [annTitle, setAnnTitle] = useState('');
-  const [annClassroomId, setAnnClassroomId] = useState(classrooms[0]?.id || '');
+  const [annClassroomId, setAnnClassroomId] = useState(classrooms[0]?.id || 'general');
   const [annContent, setAnnContent] = useState('');
 
   // Handle post announcement submit
-  const handleAddAnnSubmit = (e) => {
+  const handleAddAnnSubmit = async (e) => {
     e.preventDefault();
     if (!annTitle.trim() || !annContent.trim()) return;
-    addAnnouncement(annClassroomId, annTitle, annContent);
+    await addAnnouncement(annClassroomId, annTitle, annContent);
     setShowAddAnnModal(false);
     setAnnTitle('');
     setAnnContent('');
@@ -42,6 +44,14 @@ export default function Announcements() {
   return (
     <div className="space-y-6">
       
+      {/* Error Alert Banner */}
+      {error && (
+        <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4 text-xs text-rose-700 font-semibold flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -90,11 +100,30 @@ export default function Announcements() {
       </div>
 
       {/* Announcements Stream List */}
-      {filteredAnnouncements.length === 0 ? (
+      {isLoading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="animate-pulse rounded-3xl border border-slate-200 bg-white p-6 space-y-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-slate-200"></div>
+                <div className="space-y-1.5 flex-1">
+                  <div className="h-3.5 w-48 rounded-md bg-slate-200"></div>
+                  <div className="h-2.5 w-32 rounded-md bg-slate-200"></div>
+                </div>
+              </div>
+              <div className="h-12 w-full rounded-md bg-slate-100"></div>
+            </div>
+          ))}
+        </div>
+      ) : filteredAnnouncements.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-xs">
           <Megaphone className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-          <h4 className="text-sm font-bold text-slate-700">No announcements match query</h4>
-          <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">Try typing a different keyword or check other course board selections.</p>
+          <h4 className="text-sm font-bold text-slate-700">No announcements posted</h4>
+          <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+            {searchQuery || selectedClass !== 'all' 
+              ? 'No announcements match your search filters.' 
+              : 'Class notices, schedule tweaks, and exam dates will appear here once published by faculty.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -159,9 +188,13 @@ export default function Announcements() {
                   onChange={(e) => setAnnClassroomId(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
                 >
-                  {classrooms.map(c => (
-                    <option key={c.id} value={c.id}>{c.subject}</option>
-                  ))}
+                  {classrooms.length === 0 ? (
+                    <option value="general">General Course Board</option>
+                  ) : (
+                    classrooms.map(c => (
+                      <option key={c.id} value={c.id}>{c.subject}</option>
+                    ))
+                  )}
                 </select>
               </div>
 

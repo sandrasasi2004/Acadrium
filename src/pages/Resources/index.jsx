@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useUser } from '../../components/common/UserContext';
-import { FileText, Search, Filter, Download, Trash2, Plus, Sparkles, CheckCircle2, X, Eye } from 'lucide-react';
+import { FileText, Search, Filter, Download, Trash2, Plus, Sparkles, CheckCircle2, Eye, AlertCircle } from 'lucide-react';
 import DocumentViewer from '../../components/common/DocumentViewer';
 
 export default function Resources() {
@@ -8,9 +8,10 @@ export default function Resources() {
     userRole, 
     resources, 
     classrooms, 
+    isLoading,
+    error,
     addResource,
-    deleteResource,
-    showToast
+    deleteResource
   } = useUser();
 
   const [previewFile, setPreviewFile] = useState(null);
@@ -23,7 +24,7 @@ export default function Resources() {
   // Modal State
   const [showAddResModal, setShowAddResModal] = useState(false);
   const [resTitle, setResTitle] = useState('');
-  const [resClassroomId, setResClassroomId] = useState(classrooms[0]?.id || '');
+  const [resClassroomId, setResClassroomId] = useState(classrooms[0]?.id || 'general');
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState('');
   const [resDescription, setResDescription] = useState('');
@@ -33,7 +34,7 @@ export default function Resources() {
     if (file) {
       setSelectedFile(file);
       if (!resTitle.trim()) {
-        setResTitle(file.name.replace(/\.[^/.]+$/, "")); // strip extension
+        setResTitle(file.name.replace(/\.[^/.]+$/, ""));
       }
     }
   };
@@ -55,14 +56,14 @@ export default function Resources() {
   };
 
   // Handle resource submit
-  const handleAddResSubmit = (e) => {
+  const handleAddResSubmit = async (e) => {
     e.preventDefault();
     if (!resTitle.trim() || !selectedFile) return;
 
     const calculatedType = getFileType(selectedFile);
     const calculatedSize = getFileSizeString(selectedFile);
 
-    addResource(resClassroomId, resTitle, calculatedType, calculatedSize, selectedFile);
+    await addResource(resClassroomId, resTitle, calculatedType, calculatedSize, selectedFile);
     
     setUploadSuccess('File uploaded successfully!');
     setTimeout(() => {
@@ -77,7 +78,7 @@ export default function Resources() {
   // Filter resources based on user criteria
   const filteredResources = resources.filter(res => {
     const matchesSearch = res.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          res.classroomName.toLowerCase().includes(searchQuery.toLowerCase());
+                          (res.classroomName || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesClass = selectedClass === 'all' || res.classroomId === selectedClass;
     const matchesType = selectedType === 'all' || res.type === selectedType;
     return matchesSearch && matchesClass && matchesType;
@@ -86,6 +87,14 @@ export default function Resources() {
   return (
     <div className="space-y-6">
       
+      {/* Error Alert Banner */}
+      {error && (
+        <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4 text-xs text-rose-700 font-semibold flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -148,14 +157,26 @@ export default function Resources() {
         </div>
       </div>
 
-      {/* Resources Table Container */}
-      {filteredResources.length === 0 ? (
+      {/* Loading Skeleton */}
+      {isLoading ? (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 space-y-3 shadow-xs">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="animate-pulse h-12 bg-slate-100 rounded-2xl"></div>
+          ))}
+        </div>
+      ) : filteredResources.length === 0 ? (
+        /* Empty State */
         <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-xs">
           <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-          <h4 className="text-sm font-bold text-slate-700">No resources match your filters</h4>
-          <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">Try typing a different name, selecting a different class, or resetting your filter fields.</p>
+          <h4 className="text-sm font-bold text-slate-700">No resources available</h4>
+          <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+            {searchQuery || selectedClass !== 'all' || selectedType !== 'all' 
+              ? 'No resources match your active search filters.' 
+              : 'Shared classroom materials will appear here once uploaded by faculty.'}
+          </p>
         </div>
       ) : (
+        /* Resources Table Container */
         <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-left text-xs font-semibold">
@@ -182,7 +203,7 @@ export default function Resources() {
                         <div>
                           <button
                             onClick={() => setPreviewFile(res)}
-                            className="text-left text-slate-800 font-bold block hover:text-indigo-650 hover:underline cursor-pointer"
+                            className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
                           >
                             {res.title}
                           </button>
@@ -214,7 +235,7 @@ export default function Resources() {
                               deleteResource(res.id);
                             }
                           }}
-                          className="cursor-pointer inline-flex items-center justify-center p-2 rounded-xl border border-rose-105 border-rose-100 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors" 
+                          className="cursor-pointer inline-flex items-center justify-center p-2 rounded-xl border border-rose-100 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors" 
                           title="Delete Resource"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -234,7 +255,7 @@ export default function Resources() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
             <h3 className="text-base font-bold text-slate-800">Add Resource File</h3>
-            <p className="text-xs text-slate-500 mt-1">Provide a mock title and select the classroom directory.</p>
+            <p className="text-xs text-slate-500 mt-1">Select the file and target classroom directory.</p>
             
             {uploadSuccess && (
               <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 border border-emerald-200 flex items-center gap-2">
@@ -251,9 +272,13 @@ export default function Resources() {
                   onChange={(e) => setResClassroomId(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
                 >
-                  {classrooms.map(c => (
-                    <option key={c.id} value={c.id}>{c.subject}</option>
-                  ))}
+                  {classrooms.length === 0 ? (
+                    <option value="general">General Classroom</option>
+                  ) : (
+                    classrooms.map(c => (
+                      <option key={c.id} value={c.id}>{c.subject}</option>
+                    ))
+                  )}
                 </select>
               </div>
 
@@ -270,17 +295,17 @@ export default function Resources() {
                   />
                   <label
                     htmlFor="resource-file-input"
-                    className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/20 py-4 text-center text-xs font-bold text-indigo-650 hover:bg-indigo-50/50 hover:border-indigo-400 transition-colors"
+                    className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/20 py-4 text-center text-xs font-bold text-indigo-600 hover:bg-indigo-50/50 hover:border-indigo-400 transition-colors"
                   >
                     <Sparkles className="h-4 w-4 text-indigo-500" />
                     {selectedFile ? 'Change Selected File' : 'Choose File / Browse Files'}
                   </label>
 
                   {selectedFile && (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left space-y-1 text-[11px] font-semibold text-slate-650">
-                      <p className="font-bold text-slate-850 truncate">File: {selectedFile.name}</p>
-                      <p>Detected Format: <span className="font-bold text-indigo-650">{getFileType(selectedFile)}</span></p>
-                      <p>File Size: <span className="font-bold text-indigo-650">{getFileSizeString(selectedFile)}</span></p>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left space-y-1 text-[11px] font-semibold text-slate-600">
+                      <p className="font-bold text-slate-800 truncate">File: {selectedFile.name}</p>
+                      <p>Detected Format: <span className="font-bold text-indigo-600">{getFileType(selectedFile)}</span></p>
+                      <p>File Size: <span className="font-bold text-indigo-600">{getFileSizeString(selectedFile)}</span></p>
                     </div>
                   )}
                 </div>
@@ -336,7 +361,9 @@ export default function Resources() {
             </form>
           </div>
         </div>
-      )}      {/* DOCUMENT PREVIEW MODAL */}
+      )}
+
+      {/* DOCUMENT PREVIEW MODAL */}
       {previewFile && (
         <DocumentViewer file={previewFile} onClose={() => setPreviewFile(null)} />
       )}

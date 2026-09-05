@@ -12,7 +12,8 @@ import {
   PenTool,
   CornerDownRight,
   ClipboardList,
-  Eye
+  Eye,
+  AlertCircle
 } from 'lucide-react';
 import DocumentViewer from '../../components/common/DocumentViewer';
 
@@ -20,6 +21,8 @@ export default function Workspace() {
   const { 
     myUploads, 
     myNotes, 
+    isLoading,
+    error,
     uploadPrivateDoc, 
     deletePrivateDoc,
     addNote,
@@ -53,7 +56,7 @@ export default function Workspace() {
     if (file) {
       setSelectedFile(file);
       if (!docTitle.trim()) {
-        setDocTitle(file.name.replace(/\.[^/.]+$/, "")); // strip extension
+        setDocTitle(file.name.replace(/\.[^/.]+$/, ""));
       }
     }
   };
@@ -113,7 +116,6 @@ export default function Workspace() {
     if (isCreatingNote) {
       addNote(noteTitle, noteContent);
       setIsCreatingNote(false);
-      // Auto select first note (the new one)
       if (myNotes.length > 0) {
         setSelectedNoteId(myNotes[0].id);
       }
@@ -126,7 +128,6 @@ export default function Workspace() {
   const handleDeleteNoteClick = (id) => {
     if (window.confirm("Are you sure you want to delete this personal note? This action cannot be undone.")) {
       deleteNote(id);
-      // Select another note
       const remaining = myNotes.filter(n => n.id !== id);
       if (remaining.length > 0) {
         setSelectedNoteId(remaining[0].id);
@@ -141,6 +142,14 @@ export default function Workspace() {
   return (
     <div className="space-y-6">
       
+      {/* Error Alert Banner */}
+      {error && (
+        <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4 text-xs text-rose-700 font-semibold flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -193,7 +202,13 @@ export default function Workspace() {
         {/* MY UPLOADS VIEW */}
         {activeTab === 'uploads' && (
           <div className="space-y-4">
-            {myUploads.length === 0 ? (
+            {isLoading ? (
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 space-y-3 shadow-xs">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="animate-pulse h-12 bg-slate-100 rounded-2xl"></div>
+                ))}
+              </div>
+            ) : myUploads.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-xs">
                 <FolderUp className="mx-auto h-12 w-12 text-slate-300 mb-3" />
                 <h4 className="text-sm font-bold text-slate-700">No private documents uploaded</h4>
@@ -217,8 +232,8 @@ export default function Workspace() {
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-black text-[9px] ${
-                                doc.type === 'PDF' ? 'bg-red-50 text-red-650' :
-                                doc.type === 'PPT' ? 'bg-orange-55 bg-orange-50 text-orange-600' :
+                                doc.type === 'PDF' ? 'bg-red-50 text-red-600' :
+                                doc.type === 'PPT' ? 'bg-orange-50 text-orange-600' :
                                 doc.type === 'TXT' ? 'bg-slate-100 text-slate-600' :
                                 doc.type === 'IMAGE' ? 'bg-emerald-50 text-emerald-600' :
                                 'bg-blue-50 text-blue-600'
@@ -228,7 +243,7 @@ export default function Workspace() {
                               <div>
                                 <button
                                   onClick={() => setViewingFile(doc)}
-                                  className="text-left text-slate-800 font-bold block hover:text-indigo-650 hover:underline cursor-pointer"
+                                  className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
                                 >
                                   {doc.title}
                                 </button>
@@ -241,7 +256,7 @@ export default function Workspace() {
                           <td className="px-6 py-4 text-right space-x-2">
                             <button 
                               onClick={() => setViewingFile(doc)}
-                              className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-655 transition-colors" 
+                              className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
                               title="View Document"
                             >
                               <Eye className="h-4 w-4" />
@@ -290,7 +305,10 @@ export default function Workspace() {
                 </div>
 
                 {myNotes.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center p-4">No notes created yet</p>
+                  <div className="text-center p-6 border border-dashed border-slate-200 rounded-2xl">
+                    <p className="text-xs font-bold text-slate-600">No notes created yet</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Create personal study notes or teaching outlines.</p>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {myNotes.map((note) => (
@@ -325,7 +343,7 @@ export default function Workspace() {
               <div className="mt-4 border-t border-slate-100 pt-3">
                 <button 
                   onClick={startCreateNote}
-                  className="cursor-pointer flex w-full items-center justify-center gap-1.5 rounded-xl border border-indigo-100 bg-indigo-50/20 py-2.5 text-xs font-bold text-indigo-650 hover:bg-indigo-50/50 transition-all"
+                  className="cursor-pointer flex w-full items-center justify-center gap-1.5 rounded-xl border border-indigo-100 bg-indigo-50/20 py-2.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50/50 transition-all"
                 >
                   <Plus className="h-4 w-4" /> Create New Note
                 </button>
@@ -368,7 +386,7 @@ export default function Workspace() {
                           value={noteContent}
                           onChange={(e) => setNoteContent(e.target.value)}
                           rows="10"
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-805 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors resize-none leading-relaxed font-semibold"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors resize-none leading-relaxed font-semibold"
                         />
                       </div>
                     </div>
@@ -381,13 +399,13 @@ export default function Workspace() {
                         setIsCreatingNote(false);
                         setIsEditingNote(false);
                       }}
-                      className="cursor-pointer rounded-xl px-4 py-2.5 text-xs font-bold text-slate-550 text-slate-500 hover:bg-slate-50"
+                      className="cursor-pointer rounded-xl px-4 py-2.5 text-xs font-bold text-slate-500 hover:bg-slate-50"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="cursor-pointer rounded-xl bg-indigo-650 bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors flex items-center gap-1.5 shadow-md"
+                      className="cursor-pointer rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors flex items-center gap-1.5 shadow-md"
                     >
                       <Save className="h-4 w-4" /> Save Note
                     </button>
@@ -406,7 +424,7 @@ export default function Workspace() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={startEditNote}
-                          className="cursor-pointer rounded-xl border border-slate-250 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all flex items-center gap-1"
+                          className="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all flex items-center gap-1"
                         >
                           <PenTool className="h-3.5 w-3.5 text-indigo-500" /> Edit
                         </button>
@@ -434,9 +452,9 @@ export default function Workspace() {
                 /* EMPTY STATE */
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
                   <ClipboardList className="h-12 w-12 text-slate-300 mb-3" />
-                  <h4 className="text-sm font-bold text-slate-700">No notes selected</h4>
+                  <h4 className="text-sm font-bold text-slate-700">No note selected</h4>
                   <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
-                    Select a note from the panel directory, or click **"Create New Note"** to write teaching plans or study summaries.
+                    Select a note from the list, or click **"Create New Note"** to write teaching plans or study summaries.
                   </p>
                 </div>
               )}
@@ -468,17 +486,17 @@ export default function Workspace() {
                   />
                   <label
                     htmlFor="workspace-file-input"
-                    className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/20 py-4 text-center text-xs font-bold text-indigo-650 hover:bg-indigo-50/50 hover:border-indigo-400 transition-colors"
+                    className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/20 py-4 text-center text-xs font-bold text-indigo-600 hover:bg-indigo-50/50 hover:border-indigo-400 transition-colors"
                   >
                     <Sparkles className="h-4 w-4 text-indigo-500" />
                     {selectedFile ? 'Change Selected File' : 'Choose File / Browse Files'}
                   </label>
 
                   {selectedFile && (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left space-y-1 text-[11px] font-semibold text-slate-650">
-                      <p className="font-bold text-slate-850 truncate">File: {selectedFile.name}</p>
-                      <p>Detected Format: <span className="font-bold text-indigo-655">{getFileType(selectedFile)}</span></p>
-                      <p>File Size: <span className="font-bold text-indigo-655">{getFileSizeString(selectedFile)}</span></p>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left space-y-1 text-[11px] font-semibold text-slate-600">
+                      <p className="font-bold text-slate-800 truncate">File: {selectedFile.name}</p>
+                      <p>Detected Format: <span className="font-bold text-indigo-600">{getFileType(selectedFile)}</span></p>
+                      <p>File Size: <span className="font-bold text-indigo-600">{getFileSizeString(selectedFile)}</span></p>
                     </div>
                   )}
                 </div>
@@ -492,7 +510,7 @@ export default function Workspace() {
                   placeholder="Document Title (Auto-populated from file name)"
                   value={docTitle}
                   onChange={(e) => setDocTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-808 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
                 />
               </div>
 
@@ -522,6 +540,7 @@ export default function Workspace() {
           </div>
         </div>
       )}
+
       {/* DOCUMENT VIEWER OVERLAY */}
       {viewingFile && (
         <DocumentViewer file={viewingFile} onClose={() => setViewingFile(null)} />

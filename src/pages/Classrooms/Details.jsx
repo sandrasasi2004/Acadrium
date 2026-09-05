@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useUser } from '../../components/common/UserContext';
-import { mockStudentsList } from '../../data/mockData';
 import { 
   ArrowLeft, 
   Users, 
@@ -13,13 +12,11 @@ import {
   Plus, 
   Download, 
   Trash2, 
-  Share2,
   Copy,
   CheckCircle2,
-  ExternalLink,
   Sparkles,
-  X,
-  Eye
+  Eye,
+  AlertCircle
 } from 'lucide-react';
 import DocumentViewer from '../../components/common/DocumentViewer';
 
@@ -31,22 +28,23 @@ export default function ClassroomDetails() {
     classrooms, 
     resources, 
     announcements, 
+    isLoading,
+    error,
     addResource, 
     addAnnouncement,
     deleteResource,
     deleteAnnouncement,
     leaveClassroom,
-    deleteClassroom,
-    showToast
+    deleteClassroom
   } = useUser();
 
   const [previewFile, setPreviewFile] = useState(null);
 
-  // Find target classroom
-  const classroom = classrooms.find(c => c.id === id) || classrooms[0];
+  // Find target classroom safely
+  const classroom = classrooms.find(c => c.id === id) || (classrooms.length > 0 ? classrooms[0] : null);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState('resources'); // 'resources', 'students', 'announcements', 'settings'
+  const [activeTab, setActiveTab] = useState('resources');
 
   // Modals / State
   const [copied, setCopied] = useState(false);
@@ -61,7 +59,7 @@ export default function ClassroomDetails() {
     if (file) {
       setSelectedFile(file);
       if (!resTitle.trim()) {
-        setResTitle(file.name.replace(/\.[^/.]+$/, "")); // strip extension
+        setResTitle(file.name.replace(/\.[^/.]+$/, ""));
       }
     }
   };
@@ -88,20 +86,22 @@ export default function ClassroomDetails() {
 
   // Copy Invite Code
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(classroom.inviteCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (classroom?.inviteCode) {
+      navigator.clipboard.writeText(classroom.inviteCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   // Add Resource Action
-  const handleAddResourceSubmit = (e) => {
+  const handleAddResourceSubmit = async (e) => {
     e.preventDefault();
-    if (!resTitle.trim() || !selectedFile) return;
+    if (!resTitle.trim() || !selectedFile || !classroom) return;
 
     const calculatedType = getFileType(selectedFile);
     const calculatedSize = getFileSizeString(selectedFile);
 
-    addResource(classroom.id, resTitle, calculatedType, calculatedSize);
+    await addResource(classroom.id, resTitle, calculatedType, calculatedSize, selectedFile);
     
     setUploadSuccess('File uploaded successfully!');
     setTimeout(() => {
@@ -114,27 +114,62 @@ export default function ClassroomDetails() {
   };
 
   // Add Announcement Action
-  const handleAddAnnouncementSubmit = (e) => {
+  const handleAddAnnouncementSubmit = async (e) => {
     e.preventDefault();
-    if (!annTitle.trim() || !annContent.trim()) return;
-    addAnnouncement(classroom.id, annTitle, annContent);
+    if (!annTitle.trim() || !annContent.trim() || !classroom) return;
+    await addAnnouncement(classroom.id, annTitle, annContent);
     setShowAddAnnModal(false);
     setAnnTitle('');
     setAnnContent('');
   };
 
   // Filters resources and announcements specifically for this classroom
-  const classResources = resources.filter(r => r.classroomId === classroom.id);
-  const classAnnouncements = announcements.filter(a => a.classroomId === classroom.id);
+  const classResources = classroom ? resources.filter(r => r.classroomId === classroom.id) : [];
+  const classAnnouncements = classroom ? announcements.filter(a => a.classroomId === classroom.id) : [];
+  const enrolledStudents = []; // Dynamic empty array ready for backend API response
+
+  if (!classroom && !isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+          <Link to="/classrooms" className="hover:text-indigo-600">Classrooms</Link>
+          <span>&gt;</span>
+          <span className="text-slate-600 font-bold">Classroom Not Found</span>
+        </div>
+
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-xs">
+          <BookOpen className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+          <h3 className="text-sm font-extrabold text-slate-700">Classroom detail unavailable</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+            The requested classroom record does not exist or has been removed.
+          </p>
+          <button
+            onClick={() => navigate('/classrooms')}
+            className="cursor-pointer mt-4 inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" /> Return to Classrooms List
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       
+      {/* Error Alert Banner */}
+      {error && (
+        <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4 text-xs text-rose-700 font-semibold flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* Breadcrumb Navigation */}
       <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
         <Link to="/classrooms" className="hover:text-indigo-600">Classrooms</Link>
         <span>&gt;</span>
-        <span className="text-slate-600 font-bold">{classroom.subject}</span>
+        <span className="text-slate-600 font-bold">{classroom?.subject || 'Classroom Details'}</span>
       </div>
 
       {/* Classroom Banner */}
@@ -142,16 +177,18 @@ export default function ClassroomDetails() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">{classroom.subject}</h1>
+              <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">{classroom?.subject}</h1>
               <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-600">
-                {classroom.semester}
+                {classroom?.semester}
               </span>
             </div>
-            <p className="text-xs font-medium text-slate-500 max-w-xl leading-relaxed">{classroom.description}</p>
+            <p className="text-xs font-medium text-slate-500 max-w-xl leading-relaxed">
+              {classroom?.description || 'No classroom description provided.'}
+            </p>
           </div>
           
           <div className="flex items-center gap-2 self-start md:self-center">
-            {userRole === 'student' && (
+            {userRole === 'student' && classroom && (
               <button 
                 onClick={() => {
                   if (window.confirm("Are you sure you want to leave this classroom? You will lose access to its resources and announcements.")) {
@@ -181,7 +218,7 @@ export default function ClassroomDetails() {
             </div>
             <div>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Students Enrolled</p>
-              <p className="text-sm font-black text-slate-800 mt-0.5">{classroom.studentCount} Students</p>
+              <p className="text-sm font-black text-slate-800 mt-0.5">{classroom?.studentCount || 0} Students</p>
             </div>
           </div>
 
@@ -191,7 +228,7 @@ export default function ClassroomDetails() {
             </div>
             <div>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Course Code</p>
-              <p className="text-sm font-black text-slate-800 mt-0.5">{classroom.courseCode}</p>
+              <p className="text-sm font-black text-slate-800 mt-0.5">{classroom?.courseCode || 'N/A'}</p>
             </div>
           </div>
 
@@ -202,7 +239,7 @@ export default function ClassroomDetails() {
             <div className="flex-1 min-w-0">
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Invite Code</p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-sm font-bold font-mono text-indigo-600 truncate">{classroom.inviteCode}</span>
+                <span className="text-sm font-bold font-mono text-indigo-600 truncate">{classroom?.inviteCode || 'N/A'}</span>
                 <button
                   onClick={handleCopyCode}
                   className="cursor-pointer p-1 text-slate-400 hover:text-indigo-600 transition-colors shrink-0"
@@ -267,7 +304,13 @@ export default function ClassroomDetails() {
               )}
             </div>
 
-            {classResources.length === 0 ? (
+            {isLoading ? (
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="animate-pulse h-12 bg-slate-100 rounded-xl"></div>
+                ))}
+              </div>
+            ) : classResources.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center">
                 <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
                 <h4 className="text-sm font-bold text-slate-700">No resources uploaded yet</h4>
@@ -300,7 +343,7 @@ export default function ClassroomDetails() {
                               <div>
                                 <button
                                   onClick={() => setPreviewFile(res)}
-                                  className="text-left text-slate-800 font-bold block hover:text-indigo-655 hover:underline cursor-pointer"
+                                  className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
                                 >
                                   {res.title}
                                 </button>
@@ -328,7 +371,7 @@ export default function ClassroomDetails() {
                                     deleteResource(res.id);
                                   }
                                 }}
-                                className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-rose-100 text-rose-500 hover:bg-rose-55 hover:text-rose-700 transition-colors" 
+                                className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-rose-100 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors" 
                                 title="Delete Document"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -350,34 +393,44 @@ export default function ClassroomDetails() {
           <div className="space-y-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Class Roll-Call</h3>
             
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200 text-left text-xs font-semibold">
-                  <thead className="bg-slate-50 text-[10px] text-slate-400 uppercase tracking-wider">
-                    <tr>
-                      <th className="px-6 py-4">Student Name</th>
-                      <th className="px-6 py-4">Roll Number</th>
-                      <th className="px-6 py-4">Email Address</th>
-                      <th className="px-6 py-4 text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {mockStudentsList.map((student) => (
-                      <tr key={student.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4 font-bold text-slate-800">{student.name}</td>
-                        <td className="px-6 py-4 text-slate-500 font-mono">{student.rollNo}</td>
-                        <td className="px-6 py-4 text-slate-500">{student.email}</td>
-                        <td className="px-6 py-4 text-right">
-                          <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
-                            {student.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {enrolledStudents.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center">
+                <Users className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                <h4 className="text-sm font-bold text-slate-700">No students enrolled yet</h4>
+                <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                  Students can join this classroom using invite code: <span className="font-mono font-bold text-indigo-600">{classroom?.inviteCode}</span>
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-left text-xs font-semibold">
+                    <thead className="bg-slate-50 text-[10px] text-slate-400 uppercase tracking-wider">
+                      <tr>
+                        <th className="px-6 py-4">Student Name</th>
+                        <th className="px-6 py-4">Roll Number</th>
+                        <th className="px-6 py-4">Email Address</th>
+                        <th className="px-6 py-4 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {enrolledStudents.map((student) => (
+                        <tr key={student.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 font-bold text-slate-800">{student.name}</td>
+                          <td className="px-6 py-4 text-slate-500 font-mono">{student.rollNo}</td>
+                          <td className="px-6 py-4 text-slate-500">{student.email}</td>
+                          <td className="px-6 py-4 text-right">
+                            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                              {student.status || 'Active'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -396,7 +449,13 @@ export default function ClassroomDetails() {
               )}
             </div>
 
-            {classAnnouncements.length === 0 ? (
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2].map(i => (
+                  <div key={i} className="animate-pulse rounded-3xl border border-slate-200 bg-white p-5 h-28"></div>
+                ))}
+              </div>
+            ) : classAnnouncements.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center">
                 <Megaphone className="mx-auto h-12 w-12 text-slate-300 mb-3" />
                 <h4 className="text-sm font-bold text-slate-700">No announcements posted</h4>
@@ -439,15 +498,14 @@ export default function ClassroomDetails() {
         )}
 
         {/* SETTINGS TAB */}
-        {activeTab === 'settings' && (
+        {activeTab === 'settings' && classroom && (
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs max-w-2xl">
             <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">Classroom Settings</h3>
             <p className="text-xs text-slate-500 mt-0.5">Configure access rules and course properties.</p>
 
             <div className="mt-6 space-y-6">
               {userRole === 'faculty' ? (
-                /* Faculty Settings Form */
-                <form onSubmit={(e) => { e.preventDefault(); alert("Classroom settings updated! (Mock)"); }} className="space-y-4">
+                <form onSubmit={(e) => { e.preventDefault(); alert("Classroom settings update ready for API integration."); }} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Subject Name :</label>
@@ -498,11 +556,10 @@ export default function ClassroomDetails() {
                   </div>
                 </form>
               ) : (
-                /* Student Settings Options */
                 <div className="space-y-4">
                   <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4">
                     <h4 className="text-xs font-bold text-amber-800">Student Access</h4>
-                    <p className="text-xs text-amber-700 mt-1">You are enrolled in this classroom as a student. You have view permission for resources and announcements, and can search them using the AI RAG Assistant.</p>
+                    <p className="text-xs text-amber-700 mt-1">You are enrolled in this classroom as a student. You have view permission for resources and announcements, and can search them using the AI Assistant.</p>
                   </div>
                   
                   <div className="pt-4 flex justify-start">
@@ -526,7 +583,7 @@ export default function ClassroomDetails() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
             <h3 className="text-base font-bold text-slate-800">Add Resource File</h3>
-            <p className="text-xs text-slate-500 mt-1">Provide a mock title and select the document format type.</p>
+            <p className="text-xs text-slate-500 mt-1">Select the document format type and file to upload.</p>
             
             {uploadSuccess && (
               <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 border border-emerald-200 flex items-center gap-2">
@@ -549,17 +606,17 @@ export default function ClassroomDetails() {
                   />
                   <label
                     htmlFor="details-resource-file-input"
-                    className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/20 py-4 text-center text-xs font-bold text-indigo-650 hover:bg-indigo-50/50 hover:border-indigo-400 transition-colors"
+                    className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/20 py-4 text-center text-xs font-bold text-indigo-600 hover:bg-indigo-50/50 hover:border-indigo-400 transition-colors"
                   >
                     <Sparkles className="h-4 w-4 text-indigo-500" />
                     {selectedFile ? 'Change Selected File' : 'Choose File / Browse Files'}
                   </label>
 
                   {selectedFile && (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left space-y-1 text-[11px] font-semibold text-slate-650">
-                      <p className="font-bold text-slate-855 truncate">File: {selectedFile.name}</p>
-                      <p>Detected Format: <span className="font-bold text-indigo-655">{getFileType(selectedFile)}</span></p>
-                      <p>File Size: <span className="font-bold text-indigo-655">{getFileSizeString(selectedFile)}</span></p>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left space-y-1 text-[11px] font-semibold text-slate-600">
+                      <p className="font-bold text-slate-800 truncate">File: {selectedFile.name}</p>
+                      <p>Detected Format: <span className="font-bold text-indigo-600">{getFileType(selectedFile)}</span></p>
+                      <p>File Size: <span className="font-bold text-indigo-600">{getFileSizeString(selectedFile)}</span></p>
                     </div>
                   )}
                 </div>
@@ -668,6 +725,7 @@ export default function ClassroomDetails() {
           </div>
         </div>
       )}
+
       {/* DOCUMENT PREVIEW MODAL */}
       {previewFile && (
         <DocumentViewer file={previewFile} onClose={() => setPreviewFile(null)} />

@@ -1,94 +1,116 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  mockFaculty, 
-  mockStudent, 
-  mockClassrooms, 
-  mockResources, 
-  mockAnnouncements,
-  mockAiChatHistory,
-  mockStudentUploads,
-  mockStudentNotes,
-  mockFacultyUploads,
-  mockFacultyNotes
-} from '../../data/mockData';
+import * as api from '../../services/api';
 
 const UserContext = createContext();
 
 export function UserProvider({ children }) {
-  // Demo configurations
-  const [userRole, setUserRole] = useState('student'); // 'student' or 'faculty'
-  const [currentUser, setCurrentUser] = useState(mockStudent);
-
-  // In-memory data states
-  const [classrooms, setClassrooms] = useState(mockClassrooms);
-  const [resources, setResources] = useState(mockResources);
-  const [announcements, setAnnouncements] = useState(mockAnnouncements);
-  const [aiChats, setAiChats] = useState(mockAiChatHistory);
+  // Application role & active user state
+  const [userRole, setUserRole] = useState('student');
   
-  // Separated private Workspace states
-  const [studentNotes, setStudentNotes] = useState(mockStudentNotes);
-  const [facultyNotes, setFacultyNotes] = useState(mockFacultyNotes);
-  const [studentUploads, setStudentUploads] = useState(mockStudentUploads);
-  const [facultyUploads, setFacultyUploads] = useState(mockFacultyUploads);
+  const [currentUser, setCurrentUser] = useState({
+    id: 'usr_default',
+    name: 'Acadrium User',
+    email: 'user@acadrium.edu',
+    department: 'Academic Department',
+    semester: 'Semester II',
+    role: 'student',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'
+  });
+
+  // Empty data arrays ready for backend integration
+  const [classrooms, setClassrooms] = useState([]);
+  const [resources, setResources] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [aiChats, setAiChats] = useState([]);
+  
+  // Private Workspace empty arrays
+  const [studentNotes, setStudentNotes] = useState([]);
+  const [facultyNotes, setFacultyNotes] = useState([]);
+  const [studentUploads, setStudentUploads] = useState([]);
+  const [facultyUploads, setFacultyUploads] = useState([]);
+
+  // Data Loading & Error States
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // Global Toast state
-  const [toast, setToast] = useState(null); // { message: '', type: 'success' | 'info' | 'error' }
+  const [toast, setToast] = useState(null);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
-    // Auto dismiss after 3 seconds
     setTimeout(() => {
       setToast(null);
     }, 3000);
   };
 
-  // Keep currentUser in sync with userRole
+  // Initial load simulation via central API layer
   useEffect(() => {
-    if (userRole === 'faculty') {
-      setCurrentUser(mockFaculty);
-    } else {
-      setCurrentUser(mockStudent);
-    }
-  }, [userRole]);
+    let isMounted = true;
+    async function loadInitialData() {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const [clsRes, resRes, annRes] = await Promise.all([
+          api.listClassrooms(),
+          api.listResources(),
+          api.listAnnouncements()
+        ]);
 
-  // Computed Workspace States based on role
+        if (isMounted) {
+          if (clsRes.success) setClassrooms(clsRes.data || []);
+          if (resRes.success) setResources(resRes.data || []);
+          if (annRes.success) setAnnouncements(annRes.data || []);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err?.message || 'Failed to sync initial data from API service.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadInitialData();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Computed Workspace States based on active role
   const myNotes = userRole === 'faculty' ? facultyNotes : studentNotes;
   const myUploads = userRole === 'faculty' ? facultyUploads : studentUploads;
 
-  // Actions
-  const login = (role, username) => {
+  // Actions wired to API Service Layer
+  const login = async (role, username, password = '') => {
+    setIsLoading(true);
     setUserRole(role);
-    if (role === 'faculty') {
-      setCurrentUser({ ...mockFaculty, name: username || mockFaculty.name });
+    const res = await api.login({ role, username, password });
+    setIsLoading(false);
+    
+    if (res.success && res.data?.user) {
+      setCurrentUser(res.data.user);
+      showToast(`Logged in successfully as ${role === 'faculty' ? 'Faculty User' : 'Student User'}`, 'success');
+      return { success: true };
     } else {
-      setCurrentUser({ ...mockStudent, name: username || mockStudent.name });
+      showToast(res.error || 'Login failed', 'error');
+      return { success: false, error: res.error };
     }
-    showToast(`Logged in as ${role === 'faculty' ? 'Faculty' : 'Student'}`, 'success');
   };
 
-  const register = (role, username, email) => {
+  const register = async (role, username, email, password = '') => {
+    setIsLoading(true);
     setUserRole(role);
-    if (role === 'faculty') {
-      setCurrentUser({
-        id: `fac_${Date.now()}`,
-        name: username,
-        email: email,
-        department: "Computer Applications",
-        role: "faculty",
-        avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150"
-      });
+    const res = await api.register({ role, username, email, password });
+    setIsLoading(false);
+
+    if (res.success && res.data?.user) {
+      setCurrentUser(res.data.user);
+      showToast('Registration completed!', 'success');
+      return { success: true };
     } else {
-      setCurrentUser({
-        id: `std_${Date.now()}`,
-        name: username,
-        email: email,
-        department: "Computer Applications",
-        semester: "Semester II",
-        role: "student",
-        avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150"
-      });
+      showToast(res.error || 'Registration failed', 'error');
+      return { success: false, error: res.error };
     }
-    showToast("Registration completed!", "success");
   };
 
   const updateProfileAvatar = (avatarUrl) => {
@@ -96,47 +118,50 @@ export function UserProvider({ children }) {
       ...prev,
       avatar: avatarUrl
     }));
-    // Also sync the static objects in case they are reloaded
-    if (userRole === 'faculty') {
-      mockFaculty.avatar = avatarUrl;
-    } else {
-      mockStudent.avatar = avatarUrl;
-    }
-    showToast("Profile picture updated!", "success");
+    showToast('Profile picture updated!', 'success');
   };
 
-  const createClassroom = (subject, semester, description) => {
-    const newClass = {
-      id: `class_${Date.now()}`,
+  const createClassroom = async (subject, semester, description) => {
+    const payload = {
       subject,
       semester,
-      courseCode: `MCA${Math.floor(10000 + Math.random() * 90000)}`,
-      inviteCode: Math.random().toString(36).substring(2, 12),
-      studentCount: 0,
-      facultyId: currentUser.id,
-      facultyName: currentUser.name,
-      description: description || "No classroom description provided."
+      description,
+      facultyId: currentUser?.id || 'fac_user',
+      facultyName: currentUser?.name || 'Faculty User'
     };
-    setClassrooms([newClass, ...classrooms]);
-    showToast("Classroom created successfully!", "success");
-    return newClass;
+
+    const res = await api.createClassroom(payload);
+    if (res.success && res.data) {
+      setClassrooms(prev => [res.data, ...prev]);
+      showToast('Classroom created successfully!', 'success');
+      return res.data;
+    }
+    showToast(res.error || 'Failed to create classroom', 'error');
+    return null;
   };
 
-  const joinClassroom = (inviteCode) => {
+  const joinClassroom = async (inviteCode) => {
     const targetClass = classrooms.find(c => c.inviteCode === inviteCode);
     if (targetClass) {
       const updated = classrooms.map(c => {
         if (c.inviteCode === inviteCode) {
-          return { ...c, studentCount: c.studentCount + 1 };
+          return { ...c, studentCount: (c.studentCount || 0) + 1 };
         }
         return c;
       });
       setClassrooms(updated);
-      showToast(`Successfully joined ${targetClass.subject}!`, "success");
+      showToast(`Successfully joined ${targetClass.subject}!`, 'success');
       return { success: true, subject: targetClass.subject };
     }
-    showToast("Classroom not found. Check invite code.", "error");
-    return { success: false, message: "Classroom not found. Check the invite code." };
+    
+    const res = await api.joinClassroom(inviteCode);
+    if (res.success) {
+      showToast('Successfully joined classroom!', 'success');
+      return { success: true, subject: 'Classroom' };
+    }
+
+    showToast('Classroom not found. Check invite code.', 'error');
+    return { success: false, message: 'Classroom not found. Check the invite code.' };
   };
 
   const leaveClassroom = (id) => {
@@ -144,90 +169,85 @@ export function UserProvider({ children }) {
     if (targetClass) {
       const updated = classrooms.map(c => {
         if (c.id === id) {
-          return { ...c, studentCount: Math.max(0, c.studentCount - 1) };
+          return { ...c, studentCount: Math.max(0, (c.studentCount || 0) - 1) };
         }
         return c;
       });
       setClassrooms(updated);
-      showToast(`Left classroom ${targetClass.subject}`, "success");
+      showToast(`Left classroom ${targetClass.subject}`, 'success');
     }
   };
 
   const deleteClassroom = (id) => {
-    const targetClass = classrooms.find(c => c.id === id);
-    setClassrooms(classrooms.filter(c => c.id !== id));
-    showToast("Classroom deleted successfully", "success");
+    setClassrooms(prev => prev.filter(c => c.id !== id));
+    showToast('Classroom deleted successfully', 'success');
   };
 
-  const addResource = (classroomId, title, type, size, fileObj = null) => {
-    const newRes = {
-      id: `res_${Date.now()}`,
-      title,
-      type: type.toUpperCase(),
-      uploadedDate: new Date().toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      }),
+  const addResource = async (classroomId, title, type, size, fileObj = null) => {
+    const classroomName = classrooms.find(c => c.id === classroomId)?.subject || 'General';
+    const payload = {
       classroomId,
-      classroomName: classrooms.find(c => c.id === classroomId)?.subject || "General",
-      size: size || "1.5 MB",
-      uploadedBy: currentUser.name,
+      classroomName,
+      title,
+      type,
+      size,
+      uploadedBy: currentUser?.name || 'Faculty User',
       fileObj
     };
-    setResources([newRes, ...resources]);
-    showToast("Resource uploaded successfully!", "success");
+
+    const res = await api.uploadResource(payload);
+    if (res.success && res.data) {
+      setResources(prev => [res.data, ...prev]);
+      showToast('Resource uploaded successfully!', 'success');
+      return res.data;
+    }
+    showToast(res.error || 'Failed to upload resource', 'error');
+    return null;
   };
 
   const deleteResource = (id) => {
-    setResources(resources.filter(r => r.id !== id));
-    showToast("Resource deleted successfully", "success");
+    setResources(prev => prev.filter(r => r.id !== id));
+    showToast('Resource deleted successfully', 'success');
   };
 
-  const addAnnouncement = (classroomId, title, content) => {
-    const newAnn = {
-      id: `ann_${Date.now()}`,
+  const addAnnouncement = async (classroomId, title, content) => {
+    const classroomName = classrooms.find(c => c.id === classroomId)?.subject || 'General';
+    const payload = {
+      classroomId,
+      classroomName,
       title,
       content,
-      date: new Date().toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      }),
-      classroomId,
-      classroomName: classrooms.find(c => c.id === classroomId)?.subject || "General",
-      author: currentUser.name
+      author: currentUser?.name || 'Faculty User'
     };
-    setAnnouncements([newAnn, ...announcements]);
-    showToast("Announcement published!", "success");
+
+    const res = await api.createAnnouncement(payload);
+    if (res.success && res.data) {
+      setAnnouncements(prev => [res.data, ...prev]);
+      showToast('Announcement published!', 'success');
+      return res.data;
+    }
+    showToast(res.error || 'Failed to publish announcement', 'error');
+    return null;
   };
 
   const deleteAnnouncement = (id) => {
-    setAnnouncements(announcements.filter(a => a.id !== id));
-    showToast("Announcement deleted successfully", "success");
+    setAnnouncements(prev => prev.filter(a => a.id !== id));
+    showToast('Announcement deleted successfully', 'success');
   };
 
-  const sendAiMessage = (text) => {
+  const sendAiMessage = async (text) => {
     const userMsg = {
-      sender: "user",
+      sender: 'user',
       text,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     
     setAiChats(prev => [...prev, userMsg]);
 
-    // Simple, user-friendly RAG placeholder
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const botMsg = {
-          sender: "bot",
-          text: "AI responses will be available after backend integration. The final system will answer questions based on your uploaded classroom materials.",
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        setAiChats(prev => [...prev, botMsg]);
-        resolve();
-      }, 1000);
-    });
+    const res = await api.sendAiMessage(text);
+    if (res.success && res.data) {
+      setAiChats(prev => [...prev, res.data]);
+    }
   };
 
   // Student private Workspace uploads
@@ -241,32 +261,32 @@ export function UserProvider({ children }) {
         month: 'long',
         year: 'numeric'
       }),
-      size: size || "1.0 MB",
+      size: size || '1.0 MB',
       fileObj
     };
     if (userRole === 'faculty') {
-      setFacultyUploads([newDoc, ...facultyUploads]);
+      setFacultyUploads(prev => [newDoc, ...prev]);
     } else {
-      setStudentUploads([newDoc, ...studentUploads]);
+      setStudentUploads(prev => [newDoc, ...prev]);
     }
-    showToast("Private document uploaded!", "success");
+    showToast('Private document uploaded!', 'success');
   };
 
   const deletePrivateDoc = (id) => {
     if (userRole === 'faculty') {
-      setFacultyUploads(facultyUploads.filter(d => d.id !== id));
+      setFacultyUploads(prev => prev.filter(d => d.id !== id));
     } else {
-      setStudentUploads(studentUploads.filter(d => d.id !== id));
+      setStudentUploads(prev => prev.filter(d => d.id !== id));
     }
-    showToast("Private file deleted", "success");
+    showToast('Private file deleted', 'success');
   };
 
   // Student private Workspace Notes
   const addNote = (title, content) => {
     const newNote = {
       id: `note_${Date.now()}`,
-      title: title || "Untitled Note",
-      content: content || "",
+      title: title || 'Untitled Note',
+      content: content || '',
       date: new Date().toLocaleDateString('en-GB', {
         day: 'numeric',
         month: 'long',
@@ -274,42 +294,44 @@ export function UserProvider({ children }) {
       })
     };
     if (userRole === 'faculty') {
-      setFacultyNotes([newNote, ...facultyNotes]);
+      setFacultyNotes(prev => [newNote, ...prev]);
     } else {
-      setStudentNotes([newNote, ...studentNotes]);
+      setStudentNotes(prev => [newNote, ...prev]);
     }
-    showToast("Personal note created!", "success");
+    showToast('Personal note created!', 'success');
   };
 
   const updateNote = (id, title, content) => {
     if (userRole === 'faculty') {
-      setFacultyNotes(facultyNotes.map(n => n.id === id ? { ...n, title, content } : n));
+      setFacultyNotes(prev => prev.map(n => n.id === id ? { ...n, title, content } : n));
     } else {
-      setStudentNotes(studentNotes.map(n => n.id === id ? { ...n, title, content } : n));
+      setStudentNotes(prev => prev.map(n => n.id === id ? { ...n, title, content } : n));
     }
-    showToast("Note changes saved!", "success");
+    showToast('Note changes saved!', 'success');
   };
 
   const deleteNote = (id) => {
     if (userRole === 'faculty') {
-      setFacultyNotes(facultyNotes.filter(n => n.id !== id));
+      setFacultyNotes(prev => prev.filter(n => n.id !== id));
     } else {
-      setStudentNotes(studentNotes.filter(n => n.id !== id));
+      setStudentNotes(prev => prev.filter(n => n.id !== id));
     }
-    showToast("Note deleted successfully", "success");
+    showToast('Note deleted successfully', 'success');
   };
 
   return (
     <UserContext.Provider value={{
       userRole,
-      setUserRole,
       currentUser,
+      setCurrentUser,
       classrooms,
       resources,
       announcements,
       aiChats,
       myUploads,
       myNotes,
+      isLoading,
+      error,
       toast,
       showToast,
       login,

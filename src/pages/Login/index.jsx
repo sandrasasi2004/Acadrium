@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useUser } from '../../components/common/UserContext';
 import heroImg from '../../assets/login_hero.svg';
 import logo from '../../assets/logo.svg';
-import { User, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { User, Lock, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
   const { login } = useUser();

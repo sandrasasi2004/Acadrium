@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useUser } from '../../components/common/UserContext';
-import { BookOpen, Users, Plus, ArrowRight, ClipboardList, CheckCircle2, AlertCircle } from 'lucide-react';
+import { BookOpen, Users, Plus, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Classrooms() {
   const { 
     userRole, 
     classrooms, 
+    isLoading,
+    error,
     createClassroom, 
     joinClassroom 
   } = useUser();
@@ -22,10 +24,10 @@ export default function Classrooms() {
   const [newClassDesc, setNewClassDesc] = useState('');
 
   // Handle student joining classroom
-  const handleJoinClass = (e) => {
+  const handleJoinClass = async (e) => {
     e.preventDefault();
     if (!inviteCode.trim()) return;
-    const result = joinClassroom(inviteCode);
+    const result = await joinClassroom(inviteCode);
     if (result.success) {
       setJoinStatus({ type: 'success', message: `Successfully joined ${result.subject}!` });
       setInviteCode('');
@@ -39,10 +41,10 @@ export default function Classrooms() {
   };
 
   // Handle faculty creating classroom
-  const handleCreateClass = (e) => {
+  const handleCreateClass = async (e) => {
     e.preventDefault();
     if (!newClassName.trim()) return;
-    createClassroom(newClassName, newClassSem, newClassDesc);
+    await createClassroom(newClassName, newClassSem, newClassDesc);
     setShowCreateModal(false);
     setNewClassName('');
     setNewClassDesc('');
@@ -51,6 +53,14 @@ export default function Classrooms() {
   return (
     <div className="space-y-6">
       
+      {/* Error Alert Banner */}
+      {error && (
+        <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4 text-xs text-rose-700 font-semibold flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -76,55 +86,87 @@ export default function Classrooms() {
         )}
       </div>
 
-      {/* Classroom Cards Grid */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {classrooms.map((cls) => (
-          <div 
-            key={cls.id} 
-            className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs transition-all hover:-translate-y-1 hover:border-indigo-300 hover:shadow-indigo-50 hover:shadow-md flex flex-col justify-between group"
-          >
-            <div>
-              {/* Card Icon Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
-                  <BookOpen className="h-5 w-5" />
+      {/* Loading Skeleton Grid */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="animate-pulse rounded-3xl border border-slate-200 bg-white p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="h-10 w-10 rounded-2xl bg-slate-200"></div>
+                <div className="h-5 w-14 rounded-full bg-slate-200"></div>
+              </div>
+              <div className="h-4 w-3/4 rounded-md bg-slate-200"></div>
+              <div className="h-3 w-1/2 rounded-md bg-slate-200"></div>
+              <div className="h-12 w-full rounded-md bg-slate-100"></div>
+              <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
+                <div className="h-3 w-20 rounded-md bg-slate-200"></div>
+                <div className="h-3 w-16 rounded-md bg-slate-200"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : classrooms.length === 0 ? (
+        /* Empty State */
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-xs">
+          <BookOpen className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+          <h3 className="text-sm font-extrabold text-slate-700">No classrooms available</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+            {userRole === 'faculty' 
+              ? 'Click "Create Classroom" to set up your first course directory.'
+              : 'Click "Join Classroom" and enter the 10-character code provided by your faculty advisor.'}
+          </p>
+        </div>
+      ) : (
+        /* Classroom Cards Grid */
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {classrooms.map((cls) => (
+            <div 
+              key={cls.id} 
+              className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs transition-all hover:-translate-y-1 hover:border-indigo-300 hover:shadow-indigo-50 hover:shadow-md flex flex-col justify-between group"
+            >
+              <div>
+                {/* Card Icon Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                    <BookOpen className="h-5 w-5" />
+                  </div>
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-600">
+                    {cls.semester}
+                  </span>
                 </div>
-                <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-600">
-                  {cls.semester}
+
+                {/* Subject Title & Details */}
+                <h3 className="text-sm font-extrabold text-slate-800 tracking-tight group-hover:text-indigo-700 transition-colors line-clamp-1">
+                  {cls.subject}
+                </h3>
+                
+                <div className="mt-2 space-y-1 text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                  <p>Course: <span className="text-slate-600 font-bold">{cls.courseCode}</span></p>
+                  <p>Invite Code: <span className="text-indigo-600 font-mono font-bold select-all">{cls.inviteCode}</span></p>
+                </div>
+
+                <p className="mt-3 text-xs text-slate-500 line-clamp-2 leading-relaxed font-medium">
+                  {cls.description || 'No course description provided.'}
+                </p>
+              </div>
+
+              {/* Card Footer Details */}
+              <div className="mt-5 border-t border-slate-100 pt-4 flex items-center justify-between">
+                <span className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
+                  <Users className="h-4 w-4 text-slate-400" />
+                  {cls.studentCount || 0} Students
                 </span>
+                <Link
+                  to={`/classrooms/${cls.id}`}
+                  className="cursor-pointer inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                >
+                  Enter Class <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </Link>
               </div>
-
-              {/* Subject Title & Details */}
-              <h3 className="text-sm font-extrabold text-slate-800 tracking-tight group-hover:text-indigo-700 transition-colors line-clamp-1">
-                {cls.subject}
-              </h3>
-              
-              <div className="mt-2 space-y-1 text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                <p>Course: <span className="text-slate-600 font-bold">{cls.courseCode}</span></p>
-                <p>Invite Code: <span className="text-indigo-600 font-mono font-bold select-all">{cls.inviteCode}</span></p>
-              </div>
-
-              <p className="mt-3 text-xs text-slate-500 line-clamp-2 leading-relaxed font-medium">
-                {cls.description}
-              </p>
             </div>
-
-            {/* Card Footer Details */}
-            <div className="mt-5 border-t border-slate-100 pt-4 flex items-center justify-between">
-              <span className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
-                <Users className="h-4 w-4 text-slate-400" />
-                {cls.studentCount} Students
-              </span>
-              <Link
-                to={`/classrooms/${cls.id}`}
-                className="cursor-pointer inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800"
-              >
-                Enter Class <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* STUDENT: JOIN CLASS MODAL */}
       {showJoinModal && (

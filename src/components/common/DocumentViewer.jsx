@@ -8,9 +8,7 @@ import {
   ChevronLeft, 
   ChevronRight,
   FileText,
-  Image as ImageIcon,
-  BookOpen,
-  Presentation
+  Image as ImageIcon
 } from 'lucide-react';
 import { useUser } from './UserContext';
 
