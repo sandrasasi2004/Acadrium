@@ -6,6 +6,13 @@ from app.middleware.cors import setup_cors
 from app.routes.auth import router as auth_router
 from app.routes.classrooms import router as classrooms_router
 from app.routes.resources import router as resources_router
+from app.routes.workspace import router as workspace_router
+from app.services.resource_service import ensure_storage_directories
+from app.services.workspace_service import ensure_workspace_directories
+
+# Ensure physical upload directories exist on startup
+ensure_storage_directories()
+ensure_workspace_directories()
 
 # Configure root logger for detailed diagnostic logging
 logging.basicConfig(
@@ -36,7 +43,8 @@ setup_cors(app)
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(classrooms_router, prefix=settings.API_V1_STR)
 app.include_router(resources_router, prefix=settings.API_V1_STR)
-logger.info(f"[FastAPI Startup] Auth, Classrooms & Resources routers registered under prefix: {settings.API_V1_STR}")
+app.include_router(workspace_router, prefix=settings.API_V1_STR)
+logger.info(f"[FastAPI Startup] Auth, Classrooms, Resources & Workspace routers registered under prefix: {settings.API_V1_STR}")
 
 @app.get("/")
 def root():

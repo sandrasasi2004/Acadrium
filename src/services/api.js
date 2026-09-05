@@ -292,6 +292,78 @@ export async function deleteResource(resourceId) {
 }
 
 // ==========================================
+// WORKSPACE APIs (Phase 6 Real Backend Integration)
+// ==========================================
+
+export async function listWorkspaceFiles(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  const endpoint = `/workspace${query ? `?${query}` : ''}`;
+  const res = await fetchApi(endpoint, { method: 'GET' });
+  return res;
+}
+
+export async function getWorkspaceFile(fileId) {
+  const res = await fetchApi(`/workspace/${fileId}`, { method: 'GET' });
+  return res;
+}
+
+export async function uploadWorkspaceFile(formData) {
+  const url = `${API_BASE_URL}/workspace/upload`;
+  const headers = getAuthHeaders();
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const errorDetail = data.detail || data.message || `HTTP Error ${response.status}`;
+      return { success: false, error: errorDetail };
+    }
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err.message || 'Failed to upload workspace file.' };
+  }
+}
+
+export async function downloadWorkspaceFile(fileId, filename = 'downloaded_file') {
+  const url = `${API_BASE_URL}/workspace/${fileId}/download`;
+  const headers = getAuthHeaders();
+
+  try {
+    const response = await fetch(url, { method: 'GET', headers });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return { success: false, error: data.detail || 'Download failed.' };
+    }
+
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(blobUrl);
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message || 'Download error.' };
+  }
+}
+
+export async function deleteWorkspaceFile(fileId) {
+  const res = await fetchApi(`/workspace/${fileId}`, {
+    method: 'DELETE',
+  });
+  return res;
+}
+
+// ==========================================
 // ANNOUNCEMENT APIs (Prepared for Phase 3)
 // ==========================================
 

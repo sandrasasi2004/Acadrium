@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import * as api from '../../services/api';
 
@@ -18,7 +18,8 @@ export function UserProvider({ children }) {
   const [announcements, setAnnouncements] = useState([]);
   const [aiChats, setAiChats] = useState([]);
   
-  // Private Workspace empty arrays
+  // Private Workspace arrays & real backend files
+  const [workspaceFiles, setWorkspaceFiles] = useState([]);
   const [studentNotes, setStudentNotes] = useState([]);
   const [facultyNotes, setFacultyNotes] = useState([]);
   const [studentUploads, setStudentUploads] = useState([]);
@@ -31,12 +32,12 @@ export function UserProvider({ children }) {
   // Global Toast state
   const [toast, setToast] = useState(null);
 
-  const showToast = (message, type = 'success') => {
+  const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => {
       setToast(null);
     }, 3000);
-  };
+  }, []);
 
   // Restore authenticated session via /api/auth/me on mount or token change
   useEffect(() => {
@@ -61,17 +62,24 @@ export function UserProvider({ children }) {
           setCurrentUser(userObj);
           setUserRole(userObj.role || 'student');
           
-          // Restore global backend state for classrooms and resources
-          api.listClassrooms().then(res => {
-            if (isMounted && res.success && Array.isArray(res.data)) {
-              setClassrooms(res.data);
-            }
-          });
-          api.listResources().then(res => {
-            if (isMounted && res.success && Array.isArray(res.data)) {
-              setResources(res.data);
-            }
-          });
+          // Restore global backend state for classrooms, resources & workspace files
+          await Promise.all([
+            api.listClassrooms().then(res => {
+              if (isMounted && res.success && Array.isArray(res.data)) {
+                setClassrooms(res.data);
+              }
+            }),
+            api.listResources().then(res => {
+              if (isMounted && res.success && Array.isArray(res.data)) {
+                setResources(res.data);
+              }
+            }),
+            api.listWorkspaceFiles().then(res => {
+              if (isMounted && res.success && Array.isArray(res.data)) {
+                setWorkspaceFiles(res.data);
+              }
+            })
+          ]);
         } else {
           // Token expired or invalid -> logout session
           localStorage.removeItem('token');
@@ -88,14 +96,12 @@ export function UserProvider({ children }) {
 
   // Computed Workspace States based on active role
   const myNotes = userRole === 'faculty' ? facultyNotes : studentNotes;
-  const myUploads = userRole === 'faculty' ? facultyUploads : studentUploads;
+  const myUploads = workspaceFiles;
 
   // Classroom API Actions
-  const fetchClassrooms = async () => {
-    setIsLoading(true);
+  const fetchClassrooms = useCallback(async () => {
     setError(null);
     const res = await api.listClassrooms();
-    setIsLoading(false);
     if (res.success && Array.isArray(res.data)) {
       setClassrooms(res.data);
       return res.data;
@@ -106,10 +112,10 @@ export function UserProvider({ children }) {
       }
       return [];
     }
-  };
+  }, []);
 
   // Real Authentication Actions
-  const login = async (param1, param2, param3) => {
+  const login = useCallback(async (param1, param2, param3) => {
     let emailVal, pwdVal, roleVal;
 
     if (typeof param1 === 'object' && param1 !== null) {
@@ -146,6 +152,9 @@ export function UserProvider({ children }) {
       setToken(newToken);
       setCurrentUser(userObj);
       setUserRole(detectedRole);
+      api.listWorkspaceFiles().then(wRes => {
+        if (wRes.success && Array.isArray(wRes.data)) setWorkspaceFiles(wRes.data);
+      });
       showToast(`Logged in successfully as ${userObj.full_name || userObj.name || (detectedRole === 'faculty' ? 'Faculty User' : 'Student User')}`, 'success');
       return { success: true, user: userObj };
     } else {
@@ -154,9 +163,9 @@ export function UserProvider({ children }) {
       showToast(errorMsg, 'error');
       return { success: false, error: errorMsg };
     }
-  };
+  }, [showToast]);
 
-  const register = async (role, username, email, password) => {
+  const register = useCallback(async (role, username, email, password) => {
     setIsLoading(true);
     setError(null);
     const res = await api.register({ role, username, email, password });
@@ -170,6 +179,9 @@ export function UserProvider({ children }) {
       setToken(newToken);
       setCurrentUser(userObj);
       setUserRole(userObj.role || role);
+      api.listWorkspaceFiles().then(wRes => {
+        if (wRes.success && Array.isArray(wRes.data)) setWorkspaceFiles(wRes.data);
+      });
       showToast('Registration completed successfully!', 'success');
       return { success: true };
     } else {
@@ -178,28 +190,29 @@ export function UserProvider({ children }) {
       showToast(errorMsg, 'error');
       return { success: false, error: errorMsg };
     }
-  };
+  }, [showToast]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('token');
     setToken(null);
     setCurrentUser(null);
     setClassrooms([]);
     setResources([]);
+    setWorkspaceFiles([]);
     setAnnouncements([]);
     setAiChats([]);
     showToast('Logged out successfully', 'info');
-  };
+  }, [showToast]);
 
-  const updateProfileAvatar = (avatarUrl) => {
+  const updateProfileAvatar = useCallback((avatarUrl) => {
     setCurrentUser(prev => prev ? ({
       ...prev,
       avatar: avatarUrl
     }) : null);
     showToast('Profile picture updated!', 'success');
-  };
+  }, [showToast]);
 
-  const createClassroom = async (subject, semester, description, subjectCode = '', department = 'Computer Applications') => {
+  const createClassroom = useCallback(async (subject, semester, description, subjectCode = '', department = 'Computer Applications') => {
     const payload = {
       name: subject,
       subject,
@@ -218,9 +231,9 @@ export function UserProvider({ children }) {
     }
     showToast(res.error || 'Failed to create classroom', 'error');
     return null;
-  };
+  }, [fetchClassrooms, showToast]);
 
-  const joinClassroom = async (inviteCode) => {
+  const joinClassroom = useCallback(async (inviteCode) => {
     if (!inviteCode || !inviteCode.trim()) {
       showToast('Please enter a valid classroom code.', 'error');
       return { success: false, message: 'Please enter a valid classroom code.' };
@@ -238,9 +251,9 @@ export function UserProvider({ children }) {
     const errorMsg = res.error || 'Classroom not found. Check invite code.';
     showToast(errorMsg, 'error');
     return { success: false, message: errorMsg };
-  };
+  }, [fetchClassrooms, showToast]);
 
-  const leaveClassroom = async (id) => {
+  const leaveClassroom = useCallback(async (id) => {
     const res = await api.leaveClassroom(id);
     if (res.success) {
       showToast('Successfully left classroom', 'success');
@@ -249,9 +262,9 @@ export function UserProvider({ children }) {
     }
     showToast(res.error || 'Failed to leave classroom', 'error');
     return { success: false, error: res.error };
-  };
+  }, [fetchClassrooms, showToast]);
 
-  const deleteClassroom = async (id) => {
+  const deleteClassroom = useCallback(async (id) => {
     const res = await api.deleteClassroom(id);
     if (res.success) {
       showToast('Classroom deleted successfully', 'success');
@@ -260,12 +273,10 @@ export function UserProvider({ children }) {
     }
     showToast(res.error || 'Failed to delete classroom', 'error');
     return { success: false, error: res.error };
-  };
+  }, [fetchClassrooms, showToast]);
 
-  const loadResources = async (params = {}) => {
-    setIsLoading(true);
+  const loadResources = useCallback(async (params = {}) => {
     const res = await api.listResources(params);
-    setIsLoading(false);
     if (res.success && Array.isArray(res.data)) {
       setResources(res.data);
       return res.data;
@@ -273,9 +284,9 @@ export function UserProvider({ children }) {
       setResources([]);
       return [];
     }
-  };
+  }, []);
 
-  const fetchClassroomResources = async (classroomId) => {
+  const fetchClassroomResources = useCallback(async (classroomId) => {
     if (!classroomId) return [];
     const res = await api.getClassroomResources(classroomId);
     if (res.success && Array.isArray(res.data)) {
@@ -286,12 +297,10 @@ export function UserProvider({ children }) {
       return res.data;
     }
     return [];
-  };
+  }, []);
 
-  const uploadResource = async (formData) => {
-    setIsLoading(true);
+  const uploadResource = useCallback(async (formData) => {
     const res = await api.uploadResource(formData);
-    setIsLoading(false);
     if (res.success && res.data) {
       showToast('Resource uploaded successfully!', 'success');
       await loadResources();
@@ -300,9 +309,9 @@ export function UserProvider({ children }) {
     const errorMsg = res.error || 'Failed to upload resource';
     showToast(errorMsg, 'error');
     return { success: false, error: errorMsg };
-  };
+  }, [loadResources, showToast]);
 
-  const addResource = async (formDataOrClassroomId, title, type, size, fileObj = null) => {
+  const addResource = useCallback(async (formDataOrClassroomId, title, type, size, fileObj = null) => {
     if (formDataOrClassroomId instanceof FormData) {
       return await uploadResource(formDataOrClassroomId);
     }
@@ -313,9 +322,9 @@ export function UserProvider({ children }) {
       formData.append('file', fileObj);
     }
     return await uploadResource(formData);
-  };
+  }, [uploadResource]);
 
-  const deleteResource = async (id) => {
+  const deleteResource = useCallback(async (id) => {
     const res = await api.deleteResource(id);
     if (res.success) {
       setResources(prev => prev.filter(r => r.id !== id));
@@ -325,9 +334,45 @@ export function UserProvider({ children }) {
     const errorMsg = res.error || 'Failed to delete resource';
     showToast(errorMsg, 'error');
     return { success: false, error: errorMsg };
-  };
+  }, [showToast]);
 
-  const addAnnouncement = async (classroomId, title, content) => {
+  // Workspace API Actions (Phase 6 Real Backend Integration)
+  const loadWorkspaceFiles = useCallback(async (params = {}) => {
+    const res = await api.listWorkspaceFiles(params);
+    if (res.success && Array.isArray(res.data)) {
+      setWorkspaceFiles(res.data);
+      return res.data;
+    } else {
+      setWorkspaceFiles([]);
+      return [];
+    }
+  }, []);
+
+  const uploadWorkspaceFile = useCallback(async (formData) => {
+    const res = await api.uploadWorkspaceFile(formData);
+    if (res.success && res.data) {
+      showToast('Workspace file uploaded successfully!', 'success');
+      await loadWorkspaceFiles();
+      return { success: true, data: res.data };
+    }
+    const errorMsg = res.error || 'Failed to upload workspace file';
+    showToast(errorMsg, 'error');
+    return { success: false, error: errorMsg };
+  }, [loadWorkspaceFiles, showToast]);
+
+  const deleteWorkspaceFile = useCallback(async (id) => {
+    const res = await api.deleteWorkspaceFile(id);
+    if (res.success) {
+      setWorkspaceFiles(prev => prev.filter(f => f.id !== id));
+      showToast('Workspace file deleted successfully', 'success');
+      return { success: true };
+    }
+    const errorMsg = res.error || 'Failed to delete workspace file';
+    showToast(errorMsg, 'error');
+    return { success: false, error: errorMsg };
+  }, [showToast]);
+
+  const addAnnouncement = useCallback(async (classroomId, title, content) => {
     const classroomName = classrooms.find(c => c.id === classroomId)?.subject || 'General';
     const payload = {
       classroomId,
@@ -345,14 +390,14 @@ export function UserProvider({ children }) {
     }
     showToast(res.error || 'Failed to publish announcement', 'error');
     return null;
-  };
+  }, [classrooms, currentUser?.name, showToast]);
 
-  const deleteAnnouncement = (id) => {
+  const deleteAnnouncement = useCallback((id) => {
     setAnnouncements(prev => prev.filter(a => a.id !== id));
     showToast('Announcement deleted successfully', 'success');
-  };
+  }, [showToast]);
 
-  const sendAiMessage = async (text) => {
+  const sendAiMessage = useCallback(async (text) => {
     const userMsg = {
       sender: 'user',
       text,
@@ -365,10 +410,10 @@ export function UserProvider({ children }) {
     if (res.success && res.data) {
       setAiChats(prev => [...prev, res.data]);
     }
-  };
+  }, []);
 
   // Student private Workspace uploads
-  const uploadPrivateDoc = (title, type, size, fileObj = null) => {
+  const uploadPrivateDoc = useCallback((title, type, size, fileObj = null) => {
     const newDoc = {
       id: `upl_${Date.now()}`,
       title,
@@ -387,19 +432,19 @@ export function UserProvider({ children }) {
       setStudentUploads(prev => [newDoc, ...prev]);
     }
     showToast('Private document uploaded!', 'success');
-  };
+  }, [userRole, showToast]);
 
-  const deletePrivateDoc = (id) => {
+  const deletePrivateDoc = useCallback((id) => {
     if (userRole === 'faculty') {
       setFacultyUploads(prev => prev.filter(d => d.id !== id));
     } else {
       setStudentUploads(prev => prev.filter(d => d.id !== id));
     }
     showToast('Private file deleted', 'success');
-  };
+  }, [userRole, showToast]);
 
   // Student private Workspace Notes
-  const addNote = (title, content) => {
+  const addNote = useCallback((title, content) => {
     const newNote = {
       id: `note_${Date.now()}`,
       title: title || 'Untitled Note',
@@ -416,65 +461,111 @@ export function UserProvider({ children }) {
       setStudentNotes(prev => [newNote, ...prev]);
     }
     showToast('Personal note created!', 'success');
-  };
+  }, [userRole, showToast]);
 
-  const updateNote = (id, title, content) => {
+  const updateNote = useCallback((id, title, content) => {
     if (userRole === 'faculty') {
       setFacultyNotes(prev => prev.map(n => n.id === id ? { ...n, title, content } : n));
     } else {
       setStudentNotes(prev => prev.map(n => n.id === id ? { ...n, title, content } : n));
     }
     showToast('Note changes saved!', 'success');
-  };
+  }, [userRole, showToast]);
 
-  const deleteNote = (id) => {
+  const deleteNote = useCallback((id) => {
     if (userRole === 'faculty') {
       setFacultyNotes(prev => prev.filter(n => n.id !== id));
     } else {
       setStudentNotes(prev => prev.filter(n => n.id !== id));
     }
     showToast('Note deleted successfully', 'success');
-  };
+  }, [userRole, showToast]);
+
+  const contextValue = useMemo(() => ({
+    token,
+    userRole,
+    currentUser,
+    setCurrentUser,
+    classrooms,
+    resources,
+    workspaceFiles,
+    announcements,
+    aiChats,
+    myUploads,
+    myNotes,
+    isLoading,
+    error,
+    toast,
+    showToast,
+    fetchClassrooms,
+    login,
+    register,
+    logout,
+    updateProfileAvatar,
+    createClassroom,
+    joinClassroom,
+    leaveClassroom,
+    deleteClassroom,
+    loadResources,
+    uploadResource,
+    addResource,
+    deleteResource,
+    fetchClassroomResources,
+    loadWorkspaceFiles,
+    uploadWorkspaceFile,
+    deleteWorkspaceFile,
+    addAnnouncement,
+    deleteAnnouncement,
+    sendAiMessage,
+    uploadPrivateDoc,
+    deletePrivateDoc,
+    addNote,
+    updateNote,
+    deleteNote
+  }), [
+    token,
+    userRole,
+    currentUser,
+    classrooms,
+    resources,
+    workspaceFiles,
+    announcements,
+    aiChats,
+    myUploads,
+    myNotes,
+    isLoading,
+    error,
+    toast,
+    showToast,
+    fetchClassrooms,
+    login,
+    register,
+    logout,
+    updateProfileAvatar,
+    createClassroom,
+    joinClassroom,
+    leaveClassroom,
+    deleteClassroom,
+    loadResources,
+    uploadResource,
+    addResource,
+    deleteResource,
+    fetchClassroomResources,
+    loadWorkspaceFiles,
+    uploadWorkspaceFile,
+    deleteWorkspaceFile,
+    addAnnouncement,
+    deleteAnnouncement,
+    sendAiMessage,
+    uploadPrivateDoc,
+    deletePrivateDoc,
+    addNote,
+    updateNote,
+    deleteNote
+  ]);
 
   return (
-    <UserContext.Provider value={{
-      token,
-      userRole,
-      currentUser,
-      setCurrentUser,
-      classrooms,
-      resources,
-      announcements,
-      aiChats,
-      myUploads,
-      myNotes,
-      isLoading,
-      error,
-      toast,
-      showToast,
-      fetchClassrooms,
-      login,
-      register,
-      logout,
-      updateProfileAvatar,
-      createClassroom,
-      joinClassroom,
-      leaveClassroom,
-      deleteClassroom,
-      loadResources,
-      uploadResource,
-      addResource,
-      deleteResource,
-      fetchClassroomResources,
-      addAnnouncement,
-      deleteAnnouncement,
-      sendAiMessage,
-      uploadPrivateDoc,
-      deletePrivateDoc,
-      addNote,
-      updateNote,
-      deleteNote
-    }}>
+    <UserContext.Provider value={contextValue}>
       {/* GLOBAL TOAST ALERTS FOR ALL PAGES */}
       {toast && (
         <div className="fixed top-5 right-5 z-100 flex items-center gap-3 rounded-2xl bg-white border border-slate-200 px-4 py-3 shadow-2xl transition-all animate-in fade-in slide-in-from-top-5 duration-300">
@@ -496,3 +587,4 @@ export function UserProvider({ children }) {
 export function useUser() {
   return useContext(UserContext);
 }
+

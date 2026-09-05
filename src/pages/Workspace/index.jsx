@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUser } from '../../components/common/UserContext';
+import * as api from '../../services/api';
 import { 
   FolderUp, 
   FileText, 
@@ -12,32 +13,43 @@ import {
   PenTool,
   CornerDownRight,
   ClipboardList,
-  Eye,
+  Search,
+  CheckCircle2,
   AlertCircle
 } from 'lucide-react';
-import DocumentViewer from '../../components/common/DocumentViewer';
 
 export default function Workspace() {
   const { 
-    myUploads, 
+    workspaceFiles, 
     myNotes, 
     isLoading,
     error,
     showToast,
-    uploadPrivateDoc, 
-    deletePrivateDoc,
+    loadWorkspaceFiles,
+    uploadWorkspaceFile,
+    deleteWorkspaceFile,
     addNote,
     updateNote,
     deleteNote
   } = useUser();
 
+  useEffect(() => {
+    loadWorkspaceFiles();
+  }, []);
+
   // Tab State: 'uploads' or 'notes'
   const [activeTab, setActiveTab] = useState('uploads'); 
 
-  // Upload state
+  // Search filter state
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Upload state & modal
   const [selectedFile, setSelectedFile] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [docTitle, setDocTitle] = useState('');
+  const [docDescription, setDocDescription] = useState('');
+  const [docTags, setDocTags] = useState('');
+  const [uploadSuccess, setUploadSuccess] = useState('');
 
   // Notes state
   const [selectedNoteId, setSelectedNoteId] = useState(myNotes[0]?.id || null);
@@ -47,17 +59,6 @@ export default function Workspace() {
   // Note Form State
   const [noteTitle, setNoteTitle] = useState('');
   const [noteContent, setNoteContent] = useState('');
-
-  // Document Viewer state
-  const [viewingFile, setViewingFile] = useState(null);
-
-  const handleUploadClick = () => {
-    showToast('Workspace file upload will be available in Phase 4.', 'info');
-  };
-
-  const handlePreviewClick = (doc) => {
-    showToast('File preview will be available in Phase 4.', 'info');
-  };
 
   // File Upload Handlers
   const handleFileChange = (e) => {
@@ -74,33 +75,63 @@ export default function Workspace() {
     if (!file) return 'PDF';
     const ext = file.name.split('.').pop().toLowerCase();
     if (['ppt', 'pptx'].includes(ext)) return 'PPT';
-    if (['doc', 'docx'].includes(ext)) return 'DOCX';
-    if (['txt'].includes(ext)) return 'TXT';
+    if (['doc', 'docx'].includes(ext)) return 'DOC';
     if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return 'IMAGE';
     return 'PDF';
   };
 
-  const getFileSizeString = (file) => {
-    if (!file) return '0 KB';
-    if (file.size > 1024 * 1024) {
-      return (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+  const getFileSizeString = (sizeInBytesOrFile) => {
+    if (!sizeInBytesOrFile) return '0 KB';
+    const bytes = typeof sizeInBytesOrFile === 'number' ? sizeInBytesOrFile : sizeInBytesOrFile.size || 0;
+    if (bytes > 1024 * 1024) {
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
-    return (file.size / 1024).toFixed(0) + ' KB';
+    return (bytes / 1024).toFixed(0) + ' KB';
   };
 
-  const handleUploadSubmit = (e) => {
+  const handleUploadSubmit = async (e) => {
     e.preventDefault();
-    if (!docTitle.trim() || !selectedFile) return;
-    
-    const calculatedType = getFileType(selectedFile);
-    const calculatedSize = getFileSizeString(selectedFile);
+    if (!docTitle.trim() || !selectedFile) {
+      showToast('Please select a file and enter a title.', 'error');
+      return;
+    }
 
-    uploadPrivateDoc(docTitle, calculatedType, calculatedSize, selectedFile);
-    
-    setShowUploadModal(false);
-    setDocTitle('');
-    setSelectedFile(null);
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('title', docTitle.trim());
+    if (docDescription.trim()) formData.append('description', docDescription.trim());
+    if (docTags.trim()) formData.append('tags', docTags.trim());
+
+    const result = await uploadWorkspaceFile(formData);
+    if (result && result.success) {
+      setUploadSuccess('File uploaded to private workspace!');
+      setTimeout(() => {
+        setShowUploadModal(false);
+        setDocTitle('');
+        setDocDescription('');
+        setDocTags('');
+        setSelectedFile(null);
+        setUploadSuccess('');
+      }, 1200);
+    }
   };
+
+  const handleDownload = async (doc) => {
+    try {
+      const filename = doc.original_filename || doc.title || 'downloaded-file';
+      await api.downloadWorkspaceFile(doc.id, filename);
+    } catch (err) {
+      showToast(err.message || 'Failed to download file.', 'error');
+    }
+  };
+
+  // Filter workspace files based on search query
+  const filteredFiles = (workspaceFiles || []).filter(file => {
+    const q = searchQuery.toLowerCase();
+    return (file.title || '').toLowerCase().includes(q) ||
+           (file.original_filename || '').toLowerCase().includes(q) ||
+           (file.tags || '').toLowerCase().includes(q);
+  });
 
   // Notes Action Handlers
   const selectedNote = myNotes.find(n => n.id === selectedNoteId);
@@ -168,9 +199,8 @@ export default function Workspace() {
 
         {activeTab === 'uploads' && (
           <button
-            onClick={handleUploadClick}
-            className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-full bg-slate-400 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-500 transition-colors"
-            title="Uploads will be available in Phase 4"
+            onClick={() => setShowUploadModal(true)}
+            className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-indigo-700 transition-colors"
           >
             <Plus className="h-4 w-4" /> Upload File
           </button>
@@ -212,17 +242,36 @@ export default function Workspace() {
         {/* MY UPLOADS VIEW */}
         {activeTab === 'uploads' && (
           <div className="space-y-4">
+            
+            {/* Search Filter Bar */}
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-xs flex items-center justify-between">
+              <div className="relative w-full max-w-xs">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                  <Search className="h-4 w-4" />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search workspace files by title, tags..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-4 text-xs text-slate-800 outline-hidden transition-all focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
             {isLoading ? (
               <div className="rounded-3xl border border-slate-200 bg-white p-6 space-y-3 shadow-xs">
                 {[1, 2, 3].map(i => (
                   <div key={i} className="animate-pulse h-12 bg-slate-100 rounded-2xl"></div>
                 ))}
               </div>
-            ) : myUploads.length === 0 ? (
+            ) : filteredFiles.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-xs">
                 <FolderUp className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-                <h4 className="text-sm font-bold text-slate-700">No private documents uploaded</h4>
-                <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">This feature will be available in Phase 4.</p>
+                <h4 className="text-sm font-bold text-slate-700">No private documents found</h4>
+                <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                  {searchQuery ? 'No workspace files match your search query.' : 'Click "Upload File" to store personal course files.'}
+                </p>
               </div>
             ) : (
               <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs">
@@ -237,57 +286,59 @@ export default function Workspace() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {myUploads.map((doc) => (
-                        <tr key={doc.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-black text-[9px] ${
-                                doc.type === 'PDF' ? 'bg-red-50 text-red-600' :
-                                doc.type === 'PPT' ? 'bg-orange-50 text-orange-600' :
-                                doc.type === 'TXT' ? 'bg-slate-100 text-slate-600' :
-                                doc.type === 'IMAGE' ? 'bg-emerald-50 text-emerald-600' :
-                                'bg-blue-50 text-blue-600'
-                              }`}>
-                                {doc.type}
+                      {filteredFiles.map((doc) => {
+                        const typeTag = doc.file_type || doc.type || 'PDF';
+                        const createdDate = doc.created_at ? new Date(doc.created_at).toLocaleDateString() : (doc.uploadedDate || 'N/A');
+                        const formattedSize = getFileSizeString(doc.file_size || doc.size);
+
+                        return (
+                          <tr key={doc.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-black text-[9px] ${
+                                  typeTag === 'PDF' ? 'bg-red-50 text-red-600' :
+                                  typeTag === 'PPT' ? 'bg-orange-50 text-orange-600' :
+                                  typeTag === 'IMAGE' ? 'bg-emerald-50 text-emerald-600' :
+                                  'bg-blue-50 text-blue-600'
+                                }`}>
+                                  {typeTag}
+                                </div>
+                                <div>
+                                  <button
+                                    onClick={() => handleDownload(doc)}
+                                    className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
+                                  >
+                                    {doc.title}
+                                  </button>
+                                  <span className="text-[10px] text-slate-400 font-semibold">{formattedSize} • Private</span>
+                                </div>
                               </div>
-                              <div>
-                                <button
-                                  onClick={() => handlePreviewClick(doc)}
-                                  className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
-                                >
-                                  {doc.title}
-                                </button>
-                                <span className="text-[10px] text-slate-400 font-semibold">{doc.size} • Private</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-slate-500">{doc.type}</td>
-                          <td className="px-6 py-4 text-slate-500">{doc.uploadedDate}</td>
-                          <td className="px-6 py-4 text-right space-x-2">
-                            <button 
-                              onClick={() => handlePreviewClick(doc)}
-                              className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
-                              title="View Document"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </button>
-                            <button className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" title="Download Document">
-                              <Download className="h-4 w-4" />
-                            </button>
-                            <button 
-                              onClick={() => {
-                                if (window.confirm("Are you sure you want to delete this private file? This action cannot be undone.")) {
-                                  deletePrivateDoc(doc.id);
-                                }
-                              }}
-                              className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-rose-100 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors" 
-                              title="Delete Document"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="px-6 py-4 font-bold text-slate-500">{typeTag}</td>
+                            <td className="px-6 py-4 text-slate-500">{createdDate}</td>
+                            <td className="px-6 py-4 text-right space-x-2">
+                              <button 
+                                onClick={() => handleDownload(doc)}
+                                className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
+                                title="Download Document"
+                              >
+                                <Download className="h-4 w-4" />
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  if (window.confirm("Are you sure you want to delete this private workspace file? This action cannot be undone.")) {
+                                    deleteWorkspaceFile(doc.id);
+                                  }
+                                }}
+                                className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-rose-100 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors" 
+                                title="Delete Document"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -480,7 +531,14 @@ export default function Workspace() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
             <h3 className="text-base font-bold text-slate-800">Upload Private File</h3>
-            <p className="text-xs text-slate-500 mt-1">This file will be stored in your private repository and is not shared.</p>
+            <p className="text-xs text-slate-500 mt-1">This file will be stored in your private repository and is not shared with anyone.</p>
+
+            {uploadSuccess && (
+              <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 border border-emerald-200 flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>{uploadSuccess}</span>
+              </div>
+            )}
             
             <form onSubmit={handleUploadSubmit} className="mt-4 space-y-4">
               <div>
@@ -492,7 +550,7 @@ export default function Workspace() {
                     id="workspace-file-input"
                     onChange={handleFileChange}
                     className="hidden"
-                    accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.webp"
+                    accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg"
                   />
                   <label
                     htmlFor="workspace-file-input"
@@ -517,10 +575,32 @@ export default function Workspace() {
                 <input
                   type="text"
                   required
-                  placeholder="Document Title (Auto-populated from file name)"
+                  placeholder="Document Title"
                   value={docTitle}
                   onChange={(e) => setDocTitle(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tags (Optional) :</label>
+                <input
+                  type="text"
+                  placeholder="e.g. personal, research, draft"
+                  value={docTags}
+                  onChange={(e) => setDocTags(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Optional Description :</label>
+                <textarea
+                  placeholder="Provide short details about the workspace file..."
+                  value={docDescription}
+                  onChange={(e) => setDocDescription(e.target.value)}
+                  rows="2"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 resize-none"
                 />
               </div>
 
@@ -530,7 +610,10 @@ export default function Workspace() {
                   onClick={() => {
                     setShowUploadModal(false);
                     setDocTitle('');
+                    setDocDescription('');
+                    setDocTags('');
                     setSelectedFile(null);
+                    setUploadSuccess('');
                   }}
                   className="cursor-pointer rounded-xl px-4 py-2.5 text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors"
                 >
@@ -549,11 +632,6 @@ export default function Workspace() {
             </form>
           </div>
         </div>
-      )}
-
-      {/* DOCUMENT VIEWER OVERLAY */}
-      {viewingFile && (
-        <DocumentViewer file={viewingFile} onClose={() => setViewingFile(null)} />
       )}
 
     </div>
