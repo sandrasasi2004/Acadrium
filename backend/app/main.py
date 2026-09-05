@@ -7,6 +7,8 @@ from app.routes.auth import router as auth_router
 from app.routes.classrooms import router as classrooms_router
 from app.routes.resources import router as resources_router
 from app.routes.workspace import router as workspace_router
+from app.routes.workspace_notes import router as workspace_notes_router
+from app.routes.announcements import router as announcements_router
 from app.services.resource_service import ensure_storage_directories
 from app.services.workspace_service import ensure_workspace_directories
 
@@ -43,8 +45,10 @@ setup_cors(app)
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(classrooms_router, prefix=settings.API_V1_STR)
 app.include_router(resources_router, prefix=settings.API_V1_STR)
+app.include_router(workspace_notes_router, prefix=settings.API_V1_STR)
 app.include_router(workspace_router, prefix=settings.API_V1_STR)
-logger.info(f"[FastAPI Startup] Auth, Classrooms, Resources & Workspace routers registered under prefix: {settings.API_V1_STR}")
+app.include_router(announcements_router, prefix=settings.API_V1_STR)
+logger.info(f"[FastAPI Startup] Auth, Classrooms, Resources, Workspace, Workspace Notes & Announcements routers registered under prefix: {settings.API_V1_STR}")
 
 @app.get("/")
 def root():

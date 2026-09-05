@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.database.session import get_db
-from app.schemas.auth import UserRegister, UserLogin, Token
+from app.schemas.auth import UserRegister, UserLogin, UserUpdate, Token
 from app.services import auth_service
 from app.auth.dependencies import get_current_user
 from app.models.user import User
@@ -25,3 +25,11 @@ def get_me(current_user: User = Depends(get_current_user)):
     logger.info(f"-> [GET /api/auth/me] Endpoint called for user ID: {current_user.id}")
     return current_user.to_dict()
 
+@router.put("/me")
+def update_me(
+    data: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    logger.info(f"-> [PUT /api/auth/me] Endpoint called for user ID: {current_user.id}")
+    return auth_service.update_user_profile(db, current_user, data)

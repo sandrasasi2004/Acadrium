@@ -12,18 +12,15 @@ export function UserProvider({ children }) {
   const [userRole, setUserRole] = useState('student');
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Empty data arrays ready for backend integration
+  // Core PostgreSQL-backed Data Arrays
   const [classrooms, setClassrooms] = useState([]);
   const [resources, setResources] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [aiChats, setAiChats] = useState([]);
   
-  // Private Workspace arrays & real backend files
+  // Private Workspace State (PostgreSQL Backed)
   const [workspaceFiles, setWorkspaceFiles] = useState([]);
-  const [studentNotes, setStudentNotes] = useState([]);
-  const [facultyNotes, setFacultyNotes] = useState([]);
-  const [studentUploads, setStudentUploads] = useState([]);
-  const [facultyUploads, setFacultyUploads] = useState([]);
+  const [workspaceNotes, setWorkspaceNotes] = useState([]);
 
   // Data Loading & Error States
   const [isLoading, setIsLoading] = useState(true);
@@ -62,7 +59,7 @@ export function UserProvider({ children }) {
           setCurrentUser(userObj);
           setUserRole(userObj.role || 'student');
           
-          // Restore global backend state for classrooms, resources & workspace files
+          // Restore global backend state for classrooms, resources, workspace files, workspace notes & announcements
           await Promise.all([
             api.listClassrooms().then(res => {
               if (isMounted && res.success && Array.isArray(res.data)) {
@@ -77,6 +74,16 @@ export function UserProvider({ children }) {
             api.listWorkspaceFiles().then(res => {
               if (isMounted && res.success && Array.isArray(res.data)) {
                 setWorkspaceFiles(res.data);
+              }
+            }),
+            api.listWorkspaceNotes().then(res => {
+              if (isMounted && res.success && Array.isArray(res.data)) {
+                setWorkspaceNotes(res.data);
+              }
+            }),
+            api.listAnnouncements().then(res => {
+              if (isMounted && res.success && Array.isArray(res.data)) {
+                setAnnouncements(res.data);
               }
             })
           ]);
@@ -94,10 +101,6 @@ export function UserProvider({ children }) {
     return () => { isMounted = false; };
   }, [token]);
 
-  // Computed Workspace States based on active role
-  const myNotes = userRole === 'faculty' ? facultyNotes : studentNotes;
-  const myUploads = workspaceFiles;
-
   // Classroom API Actions
   const fetchClassrooms = useCallback(async () => {
     setError(null);
@@ -114,7 +117,7 @@ export function UserProvider({ children }) {
     }
   }, []);
 
-  // Real Authentication Actions
+  // Authentication Actions
   const login = useCallback(async (param1, param2, param3) => {
     let emailVal, pwdVal, roleVal;
 
@@ -123,12 +126,10 @@ export function UserProvider({ children }) {
       pwdVal = param1.password;
       roleVal = param1.role;
     } else if (param3 !== undefined) {
-      // Legacy signature: (role, email, password)
       roleVal = param1;
       emailVal = param2;
       pwdVal = param3;
     } else {
-      // Refined signature: (email, password)
       emailVal = param1;
       pwdVal = param2;
     }
@@ -152,9 +153,15 @@ export function UserProvider({ children }) {
       setToken(newToken);
       setCurrentUser(userObj);
       setUserRole(detectedRole);
+      
+      // Fetch workspace files and notes for logged in user
       api.listWorkspaceFiles().then(wRes => {
         if (wRes.success && Array.isArray(wRes.data)) setWorkspaceFiles(wRes.data);
       });
+      api.listWorkspaceNotes().then(nRes => {
+        if (nRes.success && Array.isArray(nRes.data)) setWorkspaceNotes(nRes.data);
+      });
+
       showToast(`Logged in successfully as ${userObj.full_name || userObj.name || (detectedRole === 'faculty' ? 'Faculty User' : 'Student User')}`, 'success');
       return { success: true, user: userObj };
     } else {
@@ -179,9 +186,14 @@ export function UserProvider({ children }) {
       setToken(newToken);
       setCurrentUser(userObj);
       setUserRole(userObj.role || role);
+      
       api.listWorkspaceFiles().then(wRes => {
         if (wRes.success && Array.isArray(wRes.data)) setWorkspaceFiles(wRes.data);
       });
+      api.listWorkspaceNotes().then(nRes => {
+        if (nRes.success && Array.isArray(nRes.data)) setWorkspaceNotes(nRes.data);
+      });
+
       showToast('Registration completed successfully!', 'success');
       return { success: true };
     } else {
@@ -199,9 +211,22 @@ export function UserProvider({ children }) {
     setClassrooms([]);
     setResources([]);
     setWorkspaceFiles([]);
+    setWorkspaceNotes([]);
     setAnnouncements([]);
     setAiChats([]);
     showToast('Logged out successfully', 'info');
+  }, [showToast]);
+
+  const updateProfile = useCallback(async (updateData) => {
+    const res = await api.updateProfile(updateData);
+    if (res.success && res.data) {
+      setCurrentUser(res.data);
+      showToast('Profile updated successfully!', 'success');
+      return { success: true, user: res.data };
+    }
+    const errorMsg = res.error || 'Failed to update profile.';
+    showToast(errorMsg, 'error');
+    return { success: false, error: errorMsg };
   }, [showToast]);
 
   const updateProfileAvatar = useCallback((avatarUrl) => {
@@ -336,16 +361,14 @@ export function UserProvider({ children }) {
     return { success: false, error: errorMsg };
   }, [showToast]);
 
-  // Workspace API Actions (Phase 6 Real Backend Integration)
+  // Workspace Files Actions (PostgreSQL Backed)
   const loadWorkspaceFiles = useCallback(async (params = {}) => {
     const res = await api.listWorkspaceFiles(params);
     if (res.success && Array.isArray(res.data)) {
       setWorkspaceFiles(res.data);
       return res.data;
-    } else {
-      setWorkspaceFiles([]);
-      return [];
     }
+    return [];
   }, []);
 
   const uploadWorkspaceFile = useCallback(async (formData) => {
@@ -372,29 +395,114 @@ export function UserProvider({ children }) {
     return { success: false, error: errorMsg };
   }, [showToast]);
 
-  const addAnnouncement = useCallback(async (classroomId, title, content) => {
-    const classroomName = classrooms.find(c => c.id === classroomId)?.subject || 'General';
-    const payload = {
-      classroomId,
-      classroomName,
-      title,
-      content,
-      author: currentUser?.name || 'Faculty User'
-    };
-
-    const res = await api.createAnnouncement(payload);
-    if (res.success && res.data) {
-      setAnnouncements(prev => [res.data, ...prev]);
-      showToast('Announcement published!', 'success');
+  // Workspace Notes Actions (PostgreSQL Backed)
+  const loadWorkspaceNotes = useCallback(async (params = {}) => {
+    const res = await api.listWorkspaceNotes(params);
+    if (res.success && Array.isArray(res.data)) {
+      setWorkspaceNotes(res.data);
       return res.data;
     }
-    showToast(res.error || 'Failed to publish announcement', 'error');
-    return null;
-  }, [classrooms, currentUser?.name, showToast]);
+    return [];
+  }, []);
 
-  const deleteAnnouncement = useCallback((id) => {
-    setAnnouncements(prev => prev.filter(a => a.id !== id));
-    showToast('Announcement deleted successfully', 'success');
+  const createWorkspaceNote = useCallback(async (title, content) => {
+    const res = await api.createWorkspaceNote({ title, content });
+    if (res.success && res.data) {
+      showToast('Personal note created successfully!', 'success');
+      await loadWorkspaceNotes();
+      return { success: true, data: res.data };
+    }
+    const errorMsg = res.error || 'Failed to create note';
+    showToast(errorMsg, 'error');
+    return { success: false, error: errorMsg };
+  }, [loadWorkspaceNotes, showToast]);
+
+  const updateWorkspaceNote = useCallback(async (id, title, content) => {
+    const res = await api.updateWorkspaceNote(id, { title, content });
+    if (res.success && res.data) {
+      showToast('Note changes saved!', 'success');
+      await loadWorkspaceNotes();
+      return { success: true, data: res.data };
+    }
+    const errorMsg = res.error || 'Failed to update note';
+    showToast(errorMsg, 'error');
+    return { success: false, error: errorMsg };
+  }, [loadWorkspaceNotes, showToast]);
+
+  const deleteWorkspaceNote = useCallback(async (id) => {
+    const res = await api.deleteWorkspaceNote(id);
+    if (res.success) {
+      setWorkspaceNotes(prev => prev.filter(n => n.id !== id));
+      showToast('Note deleted successfully', 'success');
+      return { success: true };
+    }
+    const errorMsg = res.error || 'Failed to delete note';
+    showToast(errorMsg, 'error');
+    return { success: false, error: errorMsg };
+  }, [showToast]);
+
+  // Announcement API Actions
+  const loadAnnouncements = useCallback(async (params = {}) => {
+    const res = await api.listAnnouncements(params);
+    if (res.success && Array.isArray(res.data)) {
+      setAnnouncements(res.data);
+      return res.data;
+    } else {
+      setAnnouncements([]);
+      return [];
+    }
+  }, []);
+
+  const fetchClassroomAnnouncements = useCallback(async (classroomId) => {
+    if (!classroomId) return [];
+    const res = await api.getClassroomAnnouncements(classroomId);
+    if (res.success && Array.isArray(res.data)) {
+      setAnnouncements(prev => {
+        const otherAnn = prev.filter(a => String(a.classroom_id || a.classroomId) !== String(classroomId));
+        return [...otherAnn, ...res.data];
+      });
+      return res.data;
+    }
+    return [];
+  }, []);
+
+  const createAnnouncement = useCallback(async (classroomId, title, content) => {
+    const payload = { classroomId, title, content };
+    const res = await api.createAnnouncement(payload);
+    if (res.success && res.data) {
+      showToast('Announcement published successfully!', 'success');
+      await loadAnnouncements();
+      return { success: true, data: res.data };
+    }
+    const errorMsg = res.error || 'Failed to publish announcement';
+    showToast(errorMsg, 'error');
+    return { success: false, error: errorMsg };
+  }, [loadAnnouncements, showToast]);
+
+  const addAnnouncement = createAnnouncement;
+
+  const updateAnnouncement = useCallback(async (announcementId, title, content) => {
+    const res = await api.updateAnnouncement(announcementId, { title, content });
+    if (res.success && res.data) {
+      showToast('Announcement updated successfully!', 'success');
+      await loadAnnouncements();
+      return { success: true, data: res.data };
+    }
+    const errorMsg = res.error || 'Failed to update announcement';
+    showToast(errorMsg, 'error');
+    return { success: false, error: errorMsg };
+  }, [loadAnnouncements, showToast]);
+
+  const deleteAnnouncement = useCallback(async (announcementId) => {
+    const res = await api.deleteAnnouncement(announcementId);
+    if (res.success) {
+      setAnnouncements(prev => prev.filter(a => a.id !== announcementId));
+      showToast('Announcement deleted successfully', 'success');
+      return { success: true };
+    }
+    const errorMsg = res.error || 'Failed to delete announcement';
+    showToast(errorMsg, 'error');
+    return { success: false, error: errorMsg };
   }, [showToast]);
 
   const sendAiMessage = useCallback(async (text) => {
@@ -412,75 +520,6 @@ export function UserProvider({ children }) {
     }
   }, []);
 
-  // Student private Workspace uploads
-  const uploadPrivateDoc = useCallback((title, type, size, fileObj = null) => {
-    const newDoc = {
-      id: `upl_${Date.now()}`,
-      title,
-      type: type.toUpperCase(),
-      uploadedDate: new Date().toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      }),
-      size: size || '1.0 MB',
-      fileObj
-    };
-    if (userRole === 'faculty') {
-      setFacultyUploads(prev => [newDoc, ...prev]);
-    } else {
-      setStudentUploads(prev => [newDoc, ...prev]);
-    }
-    showToast('Private document uploaded!', 'success');
-  }, [userRole, showToast]);
-
-  const deletePrivateDoc = useCallback((id) => {
-    if (userRole === 'faculty') {
-      setFacultyUploads(prev => prev.filter(d => d.id !== id));
-    } else {
-      setStudentUploads(prev => prev.filter(d => d.id !== id));
-    }
-    showToast('Private file deleted', 'success');
-  }, [userRole, showToast]);
-
-  // Student private Workspace Notes
-  const addNote = useCallback((title, content) => {
-    const newNote = {
-      id: `note_${Date.now()}`,
-      title: title || 'Untitled Note',
-      content: content || '',
-      date: new Date().toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      })
-    };
-    if (userRole === 'faculty') {
-      setFacultyNotes(prev => [newNote, ...prev]);
-    } else {
-      setStudentNotes(prev => [newNote, ...prev]);
-    }
-    showToast('Personal note created!', 'success');
-  }, [userRole, showToast]);
-
-  const updateNote = useCallback((id, title, content) => {
-    if (userRole === 'faculty') {
-      setFacultyNotes(prev => prev.map(n => n.id === id ? { ...n, title, content } : n));
-    } else {
-      setStudentNotes(prev => prev.map(n => n.id === id ? { ...n, title, content } : n));
-    }
-    showToast('Note changes saved!', 'success');
-  }, [userRole, showToast]);
-
-  const deleteNote = useCallback((id) => {
-    if (userRole === 'faculty') {
-      setFacultyNotes(prev => prev.filter(n => n.id !== id));
-    } else {
-      setStudentNotes(prev => prev.filter(n => n.id !== id));
-    }
-    showToast('Note deleted successfully', 'success');
-  }, [userRole, showToast]);
-
   const contextValue = useMemo(() => ({
     token,
     userRole,
@@ -489,10 +528,9 @@ export function UserProvider({ children }) {
     classrooms,
     resources,
     workspaceFiles,
+    workspaceNotes,
     announcements,
     aiChats,
-    myUploads,
-    myNotes,
     isLoading,
     error,
     toast,
@@ -501,6 +539,7 @@ export function UserProvider({ children }) {
     login,
     register,
     logout,
+    updateProfile,
     updateProfileAvatar,
     createClassroom,
     joinClassroom,
@@ -514,14 +553,17 @@ export function UserProvider({ children }) {
     loadWorkspaceFiles,
     uploadWorkspaceFile,
     deleteWorkspaceFile,
+    loadWorkspaceNotes,
+    createWorkspaceNote,
+    updateWorkspaceNote,
+    deleteWorkspaceNote,
+    loadAnnouncements,
+    fetchClassroomAnnouncements,
+    createAnnouncement,
     addAnnouncement,
+    updateAnnouncement,
     deleteAnnouncement,
-    sendAiMessage,
-    uploadPrivateDoc,
-    deletePrivateDoc,
-    addNote,
-    updateNote,
-    deleteNote
+    sendAiMessage
   }), [
     token,
     userRole,
@@ -529,10 +571,9 @@ export function UserProvider({ children }) {
     classrooms,
     resources,
     workspaceFiles,
+    workspaceNotes,
     announcements,
     aiChats,
-    myUploads,
-    myNotes,
     isLoading,
     error,
     toast,
@@ -541,6 +582,7 @@ export function UserProvider({ children }) {
     login,
     register,
     logout,
+    updateProfile,
     updateProfileAvatar,
     createClassroom,
     joinClassroom,
@@ -554,14 +596,17 @@ export function UserProvider({ children }) {
     loadWorkspaceFiles,
     uploadWorkspaceFile,
     deleteWorkspaceFile,
+    loadWorkspaceNotes,
+    createWorkspaceNote,
+    updateWorkspaceNote,
+    deleteWorkspaceNote,
+    loadAnnouncements,
+    fetchClassroomAnnouncements,
+    createAnnouncement,
     addAnnouncement,
+    updateAnnouncement,
     deleteAnnouncement,
-    sendAiMessage,
-    uploadPrivateDoc,
-    deletePrivateDoc,
-    addNote,
-    updateNote,
-    deleteNote
+    sendAiMessage
   ]);
 
   return (
@@ -587,4 +632,3 @@ export function UserProvider({ children }) {
 export function useUser() {
   return useContext(UserContext);
 }
-

@@ -9,7 +9,7 @@ export default function Register() {
   const { register } = useUser();
   const navigate = useNavigate();
   const [role, setRole] = useState('student'); // 'student' or 'faculty'
-  const [username, setUsername] = useState('');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -19,7 +19,7 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!username.trim() || !email.trim() || !password.trim()) {
+    if (!fullName.trim() || !email.trim() || !password.trim()) {
       setError('Please fill in all required fields');
       return;
     }
@@ -29,12 +29,12 @@ export default function Register() {
     }
     setError('');
     setIsSubmitting(true);
-    const result = await register(role, username, email, password);
+    const result = await register(role, fullName.trim(), email.trim(), password);
     setIsSubmitting(false);
     if (result.success) {
       navigate('/dashboard');
     } else {
-      setError(result.error || 'Registration failed. Email or username may already be registered.');
+      setError(result.error || 'Registration failed. Email or account details may already exist.');
     }
   };
 
@@ -63,7 +63,7 @@ export default function Register() {
               <img src={logo} alt="Acadrium Logo" className="h-14 w-auto object-contain" />
             </div>
 
-            {/* Role Select Pills (From Screenshot 2) */}
+            {/* Role Select Pills */}
             <div className="mb-6 flex justify-center">
               <div className="flex rounded-full bg-slate-100 p-1 border border-slate-200 shadow-2xs">
                 <button
@@ -98,10 +98,10 @@ export default function Register() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Username */}
+              {/* Full Name */}
               <div>
                 <label className="mb-1 block text-xs font-bold text-slate-600 uppercase tracking-wider">
-                  Username :
+                  Full Name * :
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
@@ -110,9 +110,9 @@ export default function Register() {
                   <input
                     type="text"
                     required
-                    placeholder="Enter your username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter your full name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-2.5 pl-11 pr-4 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-hidden transition-all shadow-xs"
                   />
                 </div>

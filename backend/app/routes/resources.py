@@ -76,6 +76,21 @@ def download_resource(
         headers={"Content-Disposition": f'attachment; filename="{resource.original_filename}"'}
     )
 
+@router.get("/{resource_id}/preview")
+def preview_resource(
+    resource_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Preview classroom resource file inline (Faculty owner or enrolled student)."""
+    resource, file_path = resource_service.get_resource_file_for_download(db, resource_id, current_user)
+    return FileResponse(
+        path=file_path,
+        media_type=resource.mime_type or "application/octet-stream",
+        filename=resource.original_filename,
+        headers={"Content-Disposition": f'inline; filename="{resource.original_filename}"'}
+    )
+
 @router.delete("/{resource_id}")
 def delete_classroom_resource(
     resource_id: str,

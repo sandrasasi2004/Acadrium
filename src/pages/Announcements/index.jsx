@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUser } from '../../components/common/UserContext';
-import { Megaphone, Trash2, Plus, Search, Filter, AlertCircle } from 'lucide-react';
+import { Megaphone, Trash2, Edit2, Plus, Search, Filter, AlertCircle } from 'lucide-react';
 
 export default function Announcements() {
   const { 
@@ -9,14 +9,15 @@ export default function Announcements() {
     classrooms, 
     isLoading,
     error,
-    showToast,
+    loadAnnouncements,
     addAnnouncement,
+    updateAnnouncement,
     deleteAnnouncement
   } = useUser();
 
-  const handleAddClick = () => {
-    showToast('Announcement creation will be available in Phase 4.', 'info');
-  };
+  useEffect(() => {
+    loadAnnouncements();
+  }, []);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,25 +25,61 @@ export default function Announcements() {
 
   // Modal State
   const [showAddAnnModal, setShowAddAnnModal] = useState(false);
+  const [editingAnnId, setEditingAnnId] = useState(null);
   const [annTitle, setAnnTitle] = useState('');
-  const [annClassroomId, setAnnClassroomId] = useState(classrooms[0]?.id || 'general');
+  const [annClassroomId, setAnnClassroomId] = useState('');
   const [annContent, setAnnContent] = useState('');
 
-  // Handle post announcement submit
+  // Set default classroom when classrooms load
+  useEffect(() => {
+    if (classrooms.length > 0 && !annClassroomId) {
+      setAnnClassroomId(classrooms[0].id);
+    }
+  }, [classrooms, annClassroomId]);
+
+  const handleAddClick = () => {
+    setEditingAnnId(null);
+    setAnnTitle('');
+    setAnnContent('');
+    if (classrooms.length > 0) setAnnClassroomId(classrooms[0].id);
+    setShowAddAnnModal(true);
+  };
+
+  const handleEditAnnClick = (ann) => {
+    setEditingAnnId(ann.id);
+    setAnnTitle(ann.title);
+    setAnnContent(ann.content);
+    setAnnClassroomId(ann.classroom_id || ann.classroomId);
+    setShowAddAnnModal(true);
+  };
+
+  // Handle post/update announcement submit
   const handleAddAnnSubmit = async (e) => {
     e.preventDefault();
     if (!annTitle.trim() || !annContent.trim()) return;
-    await addAnnouncement(annClassroomId, annTitle, annContent);
+    if (editingAnnId) {
+      await updateAnnouncement(editingAnnId, annTitle.trim(), annContent.trim());
+    } else {
+      const targetClassId = annClassroomId || (classrooms[0] ? classrooms[0].id : null);
+      if (!targetClassId) return;
+      await addAnnouncement(targetClassId, annTitle.trim(), annContent.trim());
+    }
     setShowAddAnnModal(false);
+    setEditingAnnId(null);
     setAnnTitle('');
     setAnnContent('');
   };
 
   // Filter announcements
   const filteredAnnouncements = announcements.filter(ann => {
-    const matchesSearch = ann.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          ann.content.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesClass = selectedClass === 'all' || ann.classroomId === selectedClass;
+    const titleMatch = ann.title?.toLowerCase().includes(searchQuery.toLowerCase());
+    const contentMatch = ann.content?.toLowerCase().includes(searchQuery.toLowerCase());
+    const clsNameMatch = (ann.classroomName || ann.classroom_name || '')
+      .toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = titleMatch || contentMatch || clsNameMatch;
+
+    const annClassId = String(ann.classroom_id || ann.classroomId);
+    const matchesClass = selectedClass === 'all' || annClassId === String(selectedClass);
     return matchesSearch && matchesClass;
   });
 
@@ -67,8 +104,7 @@ export default function Announcements() {
         {userRole === 'faculty' && (
           <button
             onClick={handleAddClick}
-            className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-full bg-slate-400 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-500 transition-colors"
-            title="Announcement creation will be available in Phase 4"
+            className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-colors"
           >
             <Plus className="h-4 w-4" /> Add Announcement
           </button>
@@ -83,7 +119,7 @@ export default function Announcements() {
           </span>
           <input
             type="text"
-            placeholder="Search announcements..."
+            placeholder="Search title, content, or classroom..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-4 text-xs text-slate-800 outline-hidden transition-all focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500"
@@ -147,27 +183,36 @@ export default function Announcements() {
                     <h3 className="text-sm font-extrabold text-slate-800 leading-tight">{ann.title}</h3>
                     <div className="flex flex-wrap items-center gap-2 mt-1">
                       <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
-                        {ann.classroomName}
+                        {ann.classroomName || ann.classroom_name || 'General'}
                       </span>
                       <span className="text-[10px] text-slate-400 font-semibold">
-                        Posted by {ann.author} • {ann.date}
+                        Posted by {ann.author || ann.author_name || 'Faculty'} • {ann.date || (ann.created_at ? new Date(ann.created_at).toLocaleDateString() : '')}
                       </span>
                     </div>
                   </div>
                 </div>
 
                 {userRole === 'faculty' && (
-                  <button 
-                    onClick={() => {
-                      if (window.confirm("Are you sure you want to delete this announcement? This action cannot be undone.")) {
-                        deleteAnnouncement(ann.id);
-                      }
-                    }}
-                    className="cursor-pointer text-slate-400 hover:text-rose-600 transition-colors p-1.5" 
-                    title="Remove Announcement"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => handleEditAnnClick(ann)}
+                      className="cursor-pointer text-slate-400 hover:text-indigo-600 transition-colors p-1.5" 
+                      title="Edit Announcement"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if (window.confirm("Are you sure you want to delete this announcement? This action cannot be undone.")) {
+                          deleteAnnouncement(ann.id);
+                        }
+                      }}
+                      className="cursor-pointer text-slate-400 hover:text-rose-600 transition-colors p-1.5" 
+                      title="Remove Announcement"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -179,30 +224,32 @@ export default function Announcements() {
         </div>
       )}
 
-      {/* FACULTY: ADD ANNOUNCEMENT MODAL */}
+      {/* FACULTY: ADD / EDIT ANNOUNCEMENT MODAL */}
       {showAddAnnModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
-            <h3 className="text-base font-bold text-slate-800">Add Announcement</h3>
-            <p className="text-xs text-slate-500 mt-1">Post a new announcement to the course board for students to read.</p>
+            <h3 className="text-base font-bold text-slate-800">{editingAnnId ? 'Edit Announcement' : 'Add Announcement'}</h3>
+            <p className="text-xs text-slate-500 mt-1">{editingAnnId ? 'Update announcement content.' : 'Post a new announcement to the course board for students to read.'}</p>
             
             <form onSubmit={handleAddAnnSubmit} className="mt-4 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Select Classroom Board :</label>
-                <select
-                  value={annClassroomId}
-                  onChange={(e) => setAnnClassroomId(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
-                >
-                  {classrooms.length === 0 ? (
-                    <option value="general">General Course Board</option>
-                  ) : (
-                    classrooms.map(c => (
-                      <option key={c.id} value={c.id}>{c.subject}</option>
-                    ))
-                  )}
-                </select>
-              </div>
+              {!editingAnnId && (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Select Classroom Board :</label>
+                  <select
+                    value={annClassroomId}
+                    onChange={(e) => setAnnClassroomId(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
+                  >
+                    {classrooms.length === 0 ? (
+                      <option value="">No classrooms available</option>
+                    ) : (
+                      classrooms.map(c => (
+                        <option key={c.id} value={c.id}>{c.subject}</option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Announcement Title :</label>
@@ -231,7 +278,12 @@ export default function Announcements() {
               <div className="flex gap-2 justify-end pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddAnnModal(false)}
+                  onClick={() => {
+                    setShowAddAnnModal(false);
+                    setEditingAnnId(null);
+                    setAnnTitle('');
+                    setAnnContent('');
+                  }}
                   className="cursor-pointer rounded-xl px-4 py-2.5 text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors"
                 >
                   Cancel
@@ -240,7 +292,7 @@ export default function Announcements() {
                   type="submit"
                   className="cursor-pointer rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors"
                 >
-                  Publish Announcement
+                  {editingAnnId ? 'Save Changes' : 'Publish Announcement'}
                 </button>
               </div>
             </form>

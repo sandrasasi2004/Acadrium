@@ -2,7 +2,7 @@ import logging
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from app.models.user import User
-from app.schemas.auth import UserRegister, UserLogin
+from app.schemas.auth import UserRegister, UserLogin, UserUpdate
 from app.auth.security import get_password_hash, verify_password, create_access_token
 
 logger = logging.getLogger("acadrium.auth_service")
@@ -27,8 +27,8 @@ def register_user(db: Session, user_data: UserRegister):
         email=user_data.email.lower(),
         password_hash=hashed_pwd,
         role=user_data.role,
-        department=user_data.department or "Computer Applications",
-        semester=user_data.semester if user_data.role == "student" else None
+        department=user_data.department if user_data.department else None,
+        semester=user_data.semester if user_data.semester else None
     )
 
     try:
@@ -93,3 +93,29 @@ def authenticate_user(db: Session, login_data: UserLogin):
         "user": user.to_dict()
     }
 
+def update_user_profile(db: Session, current_user: User, data: UserUpdate) -> dict:
+    if data.email and data.email.lower() != current_user.email.lower():
+        existing = db.query(User).filter(User.email == data.email.lower(), User.id != current_user.id).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email address is already registered to another account."
+            )
+        current_user.email = data.email.lower()
+
+    if data.full_name is not None and data.full_name.strip():
+        current_user.full_name = data.full_name.strip()
+
+    if data.password is not None and data.password.strip():
+        current_user.password_hash = get_password_hash(data.password.strip())
+
+    if data.department is not None:
+        current_user.department = data.department.strip() if data.department.strip() else None
+
+    if data.semester is not None:
+        current_user.semester = data.semester.strip() if data.semester.strip() else None
+
+    db.commit()
+    db.refresh(current_user)
+    logger.info(f"[Auth Service] Profile updated successfully for user ID: {current_user.id}")
+    return current_user.to_dict()

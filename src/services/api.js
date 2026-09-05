@@ -102,13 +102,13 @@ export async function login(credentials) {
 
 export async function register(userData) {
   const payload = {
-    username: userData.username,
-    full_name: userData.username,
+    username: userData.full_name || userData.username,
+    full_name: userData.full_name || userData.username,
     email: userData.email,
     password: userData.password,
     role: userData.role || 'student',
-    department: userData.department || 'Computer Applications',
-    semester: userData.semester || (userData.role === 'student' ? 'Semester II' : null)
+    ...(userData.department ? { department: userData.department } : {}),
+    ...(userData.semester ? { semester: userData.semester } : {})
   };
 
   const res = await fetchApi('/auth/register', {
@@ -134,6 +134,14 @@ export async function register(userData) {
 
 export async function getProfile() {
   const res = await fetchApi('/auth/me', { method: 'GET' });
+  return res;
+}
+
+export async function updateProfile(updateData) {
+  const res = await fetchApi('/auth/me', {
+    method: 'PUT',
+    body: JSON.stringify(updateData),
+  });
   return res;
 }
 
@@ -284,6 +292,22 @@ export async function downloadResource(resourceId, filename = 'downloaded_file')
   }
 }
 
+export async function previewResourceBlob(resourceId) {
+  const url = `${API_BASE_URL}/resources/${resourceId}/preview`;
+  const headers = getAuthHeaders();
+  try {
+    const response = await fetch(url, { method: 'GET', headers });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return { success: false, error: data.detail || 'Preview failed.' };
+    }
+    const blob = await response.blob();
+    return { success: true, blob, contentType: response.headers.get('content-type') };
+  } catch (err) {
+    return { success: false, error: err.message || 'Preview fetch error.' };
+  }
+}
+
 export async function deleteResource(resourceId) {
   const res = await fetchApi(`/resources/${resourceId}`, {
     method: 'DELETE',
@@ -356,6 +380,22 @@ export async function downloadWorkspaceFile(fileId, filename = 'downloaded_file'
   }
 }
 
+export async function previewWorkspaceBlob(fileId) {
+  const url = `${API_BASE_URL}/workspace/${fileId}/preview`;
+  const headers = getAuthHeaders();
+  try {
+    const response = await fetch(url, { method: 'GET', headers });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return { success: false, error: data.detail || 'Preview failed.' };
+    }
+    const blob = await response.blob();
+    return { success: true, blob, contentType: response.headers.get('content-type') };
+  } catch (err) {
+    return { success: false, error: err.message || 'Preview fetch error.' };
+  }
+}
+
 export async function deleteWorkspaceFile(fileId) {
   const res = await fetchApi(`/workspace/${fileId}`, {
     method: 'DELETE',
@@ -364,41 +404,104 @@ export async function deleteWorkspaceFile(fileId) {
 }
 
 // ==========================================
-// ANNOUNCEMENT APIs (Prepared for Phase 3)
+// WORKSPACE NOTES APIs (PostgreSQL Backed)
+// ==========================================
+
+export async function listWorkspaceNotes(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  const endpoint = `/workspace/notes${query ? `?${query}` : ''}`;
+  const res = await fetchApi(endpoint, { method: 'GET' });
+  return res;
+}
+
+export async function getWorkspaceNote(noteId) {
+  const res = await fetchApi(`/workspace/notes/${noteId}`, { method: 'GET' });
+  return res;
+}
+
+export async function createWorkspaceNote(noteData) {
+  const payload = {
+    title: noteData.title,
+    content: noteData.content || ''
+  };
+
+  const res = await fetchApi('/workspace/notes', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return res;
+}
+
+export async function updateWorkspaceNote(noteId, noteData) {
+  const payload = {
+    title: noteData.title,
+    content: noteData.content
+  };
+
+  const res = await fetchApi(`/workspace/notes/${noteId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  return res;
+}
+
+export async function deleteWorkspaceNote(noteId) {
+  const res = await fetchApi(`/workspace/notes/${noteId}`, {
+    method: 'DELETE',
+  });
+  return res;
+}
+
+// ==========================================
+// ANNOUNCEMENT APIs (Phase 5 Real Backend Integration)
 // ==========================================
 
 export async function listAnnouncements(params = {}) {
   const query = new URLSearchParams(params).toString();
   const endpoint = `/announcements${query ? `?${query}` : ''}`;
   const res = await fetchApi(endpoint, { method: 'GET' });
-  if (!res.success) {
-    return { success: true, data: [] };
-  }
+  return res;
+}
+
+export async function getClassroomAnnouncements(classroomId) {
+  const res = await fetchApi(`/announcements/classroom/${classroomId}`, { method: 'GET' });
   return res;
 }
 
 export async function createAnnouncement(announcementData) {
+  const payload = {
+    title: announcementData.title,
+    content: announcementData.content,
+    classroom_id: announcementData.classroom_id || announcementData.classroomId,
+  };
+
   const res = await fetchApi('/announcements', {
     method: 'POST',
-    body: JSON.stringify(announcementData),
+    body: JSON.stringify(payload),
   });
 
-  if (!res.success) {
-    const newAnnouncement = {
-      id: `ann_${Date.now()}`,
-      title: announcementData.title,
-      content: announcementData.content,
-      date: new Date().toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      }),
-      classroomId: announcementData.classroomId,
-      classroomName: announcementData.classroomName || 'General',
-      author: announcementData.author || 'Faculty User'
-    };
-    return { success: true, data: newAnnouncement };
-  }
+  return res;
+}
+
+export async function updateAnnouncement(announcementId, updateData) {
+  const payload = {
+    title: updateData.title,
+    content: updateData.content,
+  };
+
+  const res = await fetchApi(`/announcements/${announcementId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+  return res;
+}
+
+export async function deleteAnnouncement(announcementId) {
+  const res = await fetchApi(`/announcements/${announcementId}`, {
+    method: 'DELETE',
+  });
+
   return res;
 }
 

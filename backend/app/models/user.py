@@ -56,6 +56,8 @@ class User(Base):
     memberships = relationship("ClassroomMember", back_populates="student", cascade="all, delete-orphan")
     uploaded_resources = relationship("Resource", back_populates="uploader", cascade="all, delete-orphan")
     workspace_resources = relationship("WorkspaceResource", back_populates="owner", cascade="all, delete-orphan")
+    announcements = relationship("Announcement", back_populates="author", cascade="all, delete-orphan")
+    workspace_notes = relationship("WorkspaceNote", back_populates="owner", cascade="all, delete-orphan")
 
     def to_dict(self):
         return {
@@ -64,8 +66,8 @@ class User(Base):
             "name": self.full_name,
             "email": self.email,
             "role": self.role,
-            "department": self.department or "Computer Applications",
-            "semester": self.semester or ("Semester II" if self.role == "student" else None),
+            "department": self.department or "Not Set",
+            "semester": self.semester or "Not Set",
             "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150" if self.role == "faculty" else "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
             "created_at": self.created_at.isoformat() if self.created_at else None
         }

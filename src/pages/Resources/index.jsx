@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../../components/common/UserContext';
 import * as api from '../../services/api';
-import { FileText, Search, Filter, Download, Trash2, Plus, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import { FileText, Search, Filter, Download, Trash2, Plus, Sparkles, CheckCircle2, AlertCircle, Eye } from 'lucide-react';
+import DocumentViewer from '../../components/common/DocumentViewer';
 
 export default function Resources() {
   const { 
@@ -21,6 +22,8 @@ export default function Resources() {
     loadResources();
     fetchClassrooms();
   }, []);
+
+  const [previewFile, setPreviewFile] = useState(null);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -269,6 +272,13 @@ export default function Resources() {
                       <td className="px-6 py-4 text-slate-500 font-medium">{createdDate}</td>
                       <td className="px-6 py-4 text-right space-x-2">
                         <button 
+                          onClick={() => setPreviewFile(res)}
+                          className="cursor-pointer inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
+                          title="Preview Resource"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button 
                           onClick={() => handleDownload(res)}
                           className="cursor-pointer inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
                           title="Download Resource"
@@ -420,6 +430,11 @@ export default function Resources() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* DOCUMENT PREVIEW MODAL */}
+      {previewFile && (
+        <DocumentViewer file={previewFile} onClose={() => setPreviewFile(null)} />
       )}
 
     </div>

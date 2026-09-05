@@ -7,7 +7,7 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6)
     role: str = Field("student", pattern="^(faculty|student)$")
-    department: Optional[str] = "Computer Applications"
+    department: Optional[str] = None
     semester: Optional[str] = None
 
     def get_display_name(self) -> str:
@@ -18,6 +18,13 @@ class UserLogin(BaseModel):
     username: Optional[str] = None
     password: str
     role: Optional[str] = None
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = Field(None, min_length=6)
+    department: Optional[str] = None
+    semester: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: str

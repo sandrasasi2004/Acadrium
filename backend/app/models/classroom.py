@@ -22,6 +22,7 @@ class Classroom(Base):
     faculty = relationship("User", back_populates="created_classrooms")
     members = relationship("ClassroomMember", back_populates="classroom", cascade="all, delete-orphan")
     resources = relationship("Resource", back_populates="classroom", cascade="all, delete-orphan")
+    announcements = relationship("Announcement", back_populates="classroom", cascade="all, delete-orphan")
 
     def to_dict(self):
         return {

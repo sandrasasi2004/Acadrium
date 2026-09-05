@@ -13,6 +13,7 @@ import {
   Plus, 
   Download, 
   Trash2, 
+  Edit2,
   Copy,
   CheckCircle2,
   Sparkles,
@@ -35,8 +36,10 @@ export default function ClassroomDetails() {
     fetchClassrooms,
     loadResources,
     fetchClassroomResources,
+    fetchClassroomAnnouncements,
     uploadResource, 
     addAnnouncement,
+    updateAnnouncement,
     deleteResource,
     deleteAnnouncement,
     leaveClassroom,
@@ -51,6 +54,7 @@ export default function ClassroomDetails() {
     loadResources();
     if (id) {
       fetchClassroomResources(id);
+      fetchClassroomAnnouncements(id);
     }
   }, [id]);
 
@@ -97,6 +101,7 @@ export default function ClassroomDetails() {
   };
 
   const [showAddAnnModal, setShowAddAnnModal] = useState(false);
+  const [editingAnnId, setEditingAnnId] = useState(null);
   const [annTitle, setAnnTitle] = useState('');
   const [annContent, setAnnContent] = useState('');
 
@@ -135,21 +140,33 @@ export default function ClassroomDetails() {
     }
   };
 
-  // Add Announcement Action
+  // Add / Edit Announcement Action
   const handleAddAnnouncementSubmit = async (e) => {
     e.preventDefault();
     if (!annTitle.trim() || !annContent.trim() || !classroom) return;
-    await addAnnouncement(classroom.id, annTitle, annContent);
+    if (editingAnnId) {
+      await updateAnnouncement(editingAnnId, annTitle.trim(), annContent.trim());
+    } else {
+      await addAnnouncement(classroom.id, annTitle.trim(), annContent.trim());
+    }
     setShowAddAnnModal(false);
+    setEditingAnnId(null);
     setAnnTitle('');
     setAnnContent('');
+  };
+
+  const handleEditAnnClick = (ann) => {
+    setEditingAnnId(ann.id);
+    setAnnTitle(ann.title);
+    setAnnContent(ann.content);
+    setShowAddAnnModal(true);
   };
 
   // Filters resources and announcements specifically for this classroom
   const classResources = classroom 
     ? resources.filter(r => String(r.classroom_id || r.classroomId) === String(classroom.id)) 
     : [];
-  const classAnnouncements = classroom ? announcements.filter(a => a.classroomId === classroom.id) : [];
+  const classAnnouncements = classroom ? announcements.filter(a => String(a.classroom_id || a.classroomId) === String(classroom.id)) : [];
 
   useEffect(() => {
     async function loadStudents() {
@@ -406,6 +423,13 @@ export default function ClassroomDetails() {
                             <td className="px-6 py-4 text-slate-500">{createdDate}</td>
                             <td className="px-6 py-4 text-right space-x-2">
                               <button 
+                                onClick={() => setPreviewFile(res)}
+                                className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
+                                title="Preview Document"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </button>
+                              <button 
                                 onClick={() => api.downloadResource(res.id, res.original_filename || res.title)}
                                 className="cursor-pointer inline-flex items-center justify-center p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-600 transition-colors" 
                                 title="Download File"
@@ -490,9 +514,13 @@ export default function ClassroomDetails() {
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Class Announcements</h3>
               {userRole === 'faculty' && (
                 <button
-                  onClick={handleAddAnnClick}
-                  className="cursor-pointer inline-flex items-center gap-1 rounded-full bg-slate-400 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-500 transition-colors"
-                  title="Announcement creation will be available in Phase 4"
+                  onClick={() => {
+                    setEditingAnnId(null);
+                    setAnnTitle('');
+                    setAnnContent('');
+                    setShowAddAnnModal(true);
+                  }}
+                  className="cursor-pointer inline-flex items-center gap-1 rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-colors"
                 >
                   <Plus className="h-4 w-4" /> Add Announcement
                 </button>
@@ -522,21 +550,30 @@ export default function ClassroomDetails() {
                         </div>
                         <div>
                           <h4 className="text-xs font-extrabold text-slate-800 leading-tight">{ann.title}</h4>
-                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">By {ann.author} • {ann.date}</p>
+                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">By {ann.author || ann.author_name || 'Faculty User'} • {ann.date || (ann.created_at ? new Date(ann.created_at).toLocaleDateString() : '')}</p>
                         </div>
                       </div>
                       {userRole === 'faculty' && (
-                        <button 
-                          onClick={() => {
-                            if (window.confirm("Are you sure you want to delete this announcement? This action cannot be undone.")) {
-                              deleteAnnouncement(ann.id);
-                            }
-                          }}
-                          className="cursor-pointer text-slate-400 hover:text-rose-600 transition-colors p-1.5" 
-                          title="Remove Announcement"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => handleEditAnnClick(ann)}
+                            className="cursor-pointer text-slate-400 hover:text-indigo-600 transition-colors p-1.5" 
+                            title="Edit Announcement"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if (window.confirm("Are you sure you want to delete this announcement? This action cannot be undone.")) {
+                                deleteAnnouncement(ann.id);
+                              }
+                            }}
+                            className="cursor-pointer text-slate-400 hover:text-rose-600 transition-colors p-1.5" 
+                            title="Remove Announcement"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       )}
                     </div>
                     <p className="mt-4 text-xs text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">{ann.content}</p>
@@ -735,12 +772,12 @@ export default function ClassroomDetails() {
         </div>
       )}
 
-      {/* ADD ANNOUNCEMENT MODAL */}
+      {/* ADD / EDIT ANNOUNCEMENT MODAL */}
       {showAddAnnModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-200">
-            <h3 className="text-base font-bold text-slate-800">Add Announcement</h3>
-            <p className="text-xs text-slate-500 mt-1">Post a new announcement to the course board for students to read.</p>
+            <h3 className="text-base font-bold text-slate-800">{editingAnnId ? 'Edit Announcement' : 'Add Announcement'}</h3>
+            <p className="text-xs text-slate-500 mt-1">{editingAnnId ? 'Update announcement details.' : 'Post a new announcement to the course board for students to read.'}</p>
             
             <form onSubmit={handleAddAnnouncementSubmit} className="mt-4 space-y-4">
               <div>
@@ -770,7 +807,12 @@ export default function ClassroomDetails() {
               <div className="flex gap-2 justify-end pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddAnnModal(false)}
+                  onClick={() => {
+                    setShowAddAnnModal(false);
+                    setEditingAnnId(null);
+                    setAnnTitle('');
+                    setAnnContent('');
+                  }}
                   className="cursor-pointer rounded-xl px-4 py-2.5 text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors"
                 >
                   Cancel
@@ -779,7 +821,7 @@ export default function ClassroomDetails() {
                   type="submit"
                   className="cursor-pointer rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors"
                 >
-                  Publish Announcement
+                  {editingAnnId ? 'Save Changes' : 'Publish Announcement'}
                 </button>
               </div>
             </form>

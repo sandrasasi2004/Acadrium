@@ -64,6 +64,21 @@ def download_workspace_file(
         headers={"Content-Disposition": f'attachment; filename="{res.original_filename}"'}
     )
 
+@router.get("/{id}/preview")
+def preview_workspace_file(
+    id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Preview private workspace file inline (Owner only)."""
+    res, file_path = workspace_service.get_workspace_file_for_download(db, id, current_user)
+    return FileResponse(
+        path=file_path,
+        media_type=res.mime_type or "application/octet-stream",
+        filename=res.original_filename,
+        headers={"Content-Disposition": f'inline; filename="{res.original_filename}"'}
+    )
+
 @router.delete("/{id}")
 def delete_workspace_file(
     id: str,
