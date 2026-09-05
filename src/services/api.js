@@ -1,137 +1,158 @@
 /**
  * Acadrium Centralized API Service Layer
- * Prepared for Phase 2 & Review 3 Backend Integration
+ * Fully Integrated with FastAPI Backend & JWT Authentication
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
 /**
- * Generic fetch wrapper for placeholder backend requests
- * @param {string} endpoint 
- * @param {RequestInit} [options] 
- * @returns {Promise<{ success: boolean, data?: any, error?: string, message?: string }>}
+ * Helper to get Bearer Authorization headers from localStorage
+ */
+function getAuthHeaders() {
+  const token = localStorage.getItem('token');
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
+/**
+ * Generic fetch wrapper for backend REST API requests
  */
 async function fetchApi(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-  const config = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
+  const headers = {
+    'Content-Type': 'application/json',
+    ...getAuthHeaders(),
+    ...options.headers,
   };
 
+  console.group(`[Acadrium API Call] ${options.method || 'GET'} ${url}`);
+  console.log('Request URL:', url);
+  console.log('Request Method:', options.method || 'GET');
+  console.log('Request Headers:', headers);
+  if (options.body) {
+    try {
+      console.log('Request Payload:', JSON.parse(options.body));
+    } catch {
+      console.log('Request Body:', options.body);
+    }
+  }
+
   try {
-    const response = await fetch(url, config);
+    const response = await fetch(url, { ...options, headers });
+    const data = await response.json().catch(() => ({}));
+
+    console.log('Response Status:', response.status);
+    console.log('Response Headers:', Object.fromEntries(response.headers.entries()));
+    console.log('Response Body:', data);
+    console.groupEnd();
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      const errorDetail = data.detail || data.message || `HTTP Error ${response.status}`;
+      console.warn(`[Acadrium API Warning] Request failed with status ${response.status}:`, errorDetail);
       return {
         success: false,
-        error: errorData.message || `HTTP Error ${response.status}`,
+        error: errorDetail,
+        status: response.status
       };
     }
-    const data = await response.json();
     return { success: true, data };
   } catch (err) {
-    // Expected during Phase 1 prior to backend running
+    console.error('[Acadrium API Exception] Network or client error:', err);
+    console.groupEnd();
     return {
       success: false,
-      error: err.message || 'Network error: Backend server unavailable',
+      error: err.message || 'Unable to connect to Acadrium backend server.',
     };
   }
 }
 
 // ==========================================
-// AUTHENTICATION APIs
+// AUTHENTICATION APIs (FastAPI Phase 2)
 // ==========================================
 
 export async function login(credentials) {
-  // Placeholder API endpoint: POST /api/auth/login
+  const payload = {
+    email: credentials.username || credentials.email,
+    username: credentials.username,
+    password: credentials.password,
+    role: credentials.role || 'student'
+  };
+
   const res = await fetchApi('/auth/login', {
     method: 'POST',
-    body: JSON.stringify(credentials),
+    body: JSON.stringify(payload),
   });
 
-  if (!res.success) {
-    // Return structured frontend fallback response when backend is not active
+  if (res.success && res.data?.access_token) {
     return {
       success: true,
       data: {
-        user: {
-          id: `usr_${Date.now()}`,
-          name: credentials.username || (credentials.role === 'faculty' ? 'Faculty User' : 'Student User'),
-          email: `${(credentials.username || 'user').toLowerCase().replace(/\s+/g, '')}@acadrium.edu`,
-          role: credentials.role || 'student',
-          department: 'Computer Applications',
-          semester: credentials.role === 'faculty' ? undefined : 'Semester II',
-          avatar: credentials.role === 'faculty' 
-            ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150' 
-            : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'
-        },
-        token: 'placeholder_jwt_token'
+        token: res.data.access_token,
+        user: res.data.user
       }
     };
   }
-  return res;
+
+  return {
+    success: false,
+    error: res.error || 'Login failed. Please check your credentials.'
+  };
 }
 
 export async function register(userData) {
-  // Placeholder API endpoint: POST /api/auth/register
+  const payload = {
+    username: userData.username,
+    full_name: userData.username,
+    email: userData.email,
+    password: userData.password,
+    role: userData.role || 'student',
+    department: userData.department || 'Computer Applications',
+    semester: userData.semester || (userData.role === 'student' ? 'Semester II' : null)
+  };
+
   const res = await fetchApi('/auth/register', {
     method: 'POST',
-    body: JSON.stringify(userData),
+    body: JSON.stringify(payload),
   });
 
-  if (!res.success) {
+  if (res.success && res.data?.access_token) {
     return {
       success: true,
       data: {
-        user: {
-          id: `usr_${Date.now()}`,
-          name: userData.username,
-          email: userData.email,
-          role: userData.role || 'student',
-          department: 'Computer Applications',
-          semester: userData.role === 'faculty' ? undefined : 'Semester II',
-          avatar: userData.role === 'faculty' 
-            ? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150' 
-            : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150'
-        },
-        token: 'placeholder_jwt_token'
+        token: res.data.access_token,
+        user: res.data.user
       }
     };
   }
-  return res;
+
+  return {
+    success: false,
+    error: res.error || 'Registration failed. Please try again.'
+  };
 }
 
 export async function getProfile() {
-  // Placeholder API endpoint: GET /api/auth/profile
-  const res = await fetchApi('/auth/profile', { method: 'GET' });
+  const res = await fetchApi('/auth/me', { method: 'GET' });
   return res;
 }
 
 // ==========================================
-// CLASSROOM APIs
+// CLASSROOM APIs (Prepared for Phase 3)
 // ==========================================
 
 export async function listClassrooms() {
-  // Placeholder API endpoint: GET /api/classrooms
   const res = await fetchApi('/classrooms', { method: 'GET' });
   if (!res.success) {
-    // Return empty list state prior to backend connection
     return { success: true, data: [] };
   }
   return res;
 }
 
 export async function getClassroomDetails(classroomId) {
-  // Placeholder API endpoint: GET /api/classrooms/:id
   const res = await fetchApi(`/classrooms/${classroomId}`, { method: 'GET' });
   return res;
 }
 
 export async function createClassroom(classroomData) {
-  // Placeholder API endpoint: POST /api/classrooms
   const res = await fetchApi('/classrooms', {
     method: 'POST',
     body: JSON.stringify(classroomData),
@@ -146,7 +167,7 @@ export async function createClassroom(classroomData) {
       inviteCode: Math.random().toString(36).substring(2, 12),
       studentCount: 0,
       facultyId: classroomData.facultyId || 'fac_user',
-      facultyName: classroomData.facultyName || 'Faculty Member',
+      facultyName: classroomData.facultyName || 'Faculty User',
       description: classroomData.description || ''
     };
     return { success: true, data: newClassroom };
@@ -155,7 +176,6 @@ export async function createClassroom(classroomData) {
 }
 
 export async function joinClassroom(inviteCode) {
-  // Placeholder API endpoint: POST /api/classrooms/join
   const res = await fetchApi('/classrooms/join', {
     method: 'POST',
     body: JSON.stringify({ inviteCode }),
@@ -164,11 +184,10 @@ export async function joinClassroom(inviteCode) {
 }
 
 // ==========================================
-// RESOURCE APIs
+// RESOURCE APIs (Prepared for Phase 3)
 // ==========================================
 
 export async function listResources(params = {}) {
-  // Placeholder API endpoint: GET /api/resources
   const query = new URLSearchParams(params).toString();
   const endpoint = `/resources${query ? `?${query}` : ''}`;
   const res = await fetchApi(endpoint, { method: 'GET' });
@@ -179,7 +198,6 @@ export async function listResources(params = {}) {
 }
 
 export async function uploadResource(resourceData) {
-  // Placeholder API endpoint: POST /api/resources
   const res = await fetchApi('/resources', {
     method: 'POST',
     body: JSON.stringify(resourceData),
@@ -198,7 +216,7 @@ export async function uploadResource(resourceData) {
       classroomId: resourceData.classroomId,
       classroomName: resourceData.classroomName || 'General',
       size: resourceData.size || '1.5 MB',
-      uploadedBy: resourceData.uploadedBy || 'Faculty Member',
+      uploadedBy: resourceData.uploadedBy || 'Faculty User',
       fileObj: resourceData.fileObj || null
     };
     return { success: true, data: newResource };
@@ -207,11 +225,10 @@ export async function uploadResource(resourceData) {
 }
 
 // ==========================================
-// ANNOUNCEMENT APIs
+// ANNOUNCEMENT APIs (Prepared for Phase 3)
 // ==========================================
 
 export async function listAnnouncements(params = {}) {
-  // Placeholder API endpoint: GET /api/announcements
   const query = new URLSearchParams(params).toString();
   const endpoint = `/announcements${query ? `?${query}` : ''}`;
   const res = await fetchApi(endpoint, { method: 'GET' });
@@ -222,7 +239,6 @@ export async function listAnnouncements(params = {}) {
 }
 
 export async function createAnnouncement(announcementData) {
-  // Placeholder API endpoint: POST /api/announcements
   const res = await fetchApi('/announcements', {
     method: 'POST',
     body: JSON.stringify(announcementData),
@@ -240,7 +256,7 @@ export async function createAnnouncement(announcementData) {
       }),
       classroomId: announcementData.classroomId,
       classroomName: announcementData.classroomName || 'General',
-      author: announcementData.author || 'Faculty Member'
+      author: announcementData.author || 'Faculty User'
     };
     return { success: true, data: newAnnouncement };
   }
@@ -248,11 +264,10 @@ export async function createAnnouncement(announcementData) {
 }
 
 // ==========================================
-// AI ASSISTANT API (Placeholder Only)
+// AI ASSISTANT API
 // ==========================================
 
 export async function sendAiMessage(_messageText) {
-  // Placeholder response required for Phase 1 frontend cleanup
   return Promise.resolve({
     success: true,
     data: {

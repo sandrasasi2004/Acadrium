@@ -13,16 +13,23 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!username.trim()) {
-      setError('Please enter a username');
+    if (!username.trim() || !password.trim()) {
+      setError('Please enter both username and password');
       return;
     }
     setError('');
-    login(role, username);
-    navigate('/dashboard');
+    setIsSubmitting(true);
+    const result = await login(role, username, password);
+    setIsSubmitting(false);
+    if (result.success) {
+      navigate('/dashboard');
+    } else {
+      setError(result.error || 'Login failed. Invalid email or password.');
+    }
   };
 
   return (
@@ -142,9 +149,10 @@ export default function Login() {
               {/* LOGIN BUTTON */}
               <button
                 type="submit"
-                className="cursor-pointer mt-2 w-full rounded-full bg-indigo-600 py-3 text-sm font-bold text-white uppercase tracking-wider shadow-lg hover:bg-indigo-700 active:scale-98 transition-all hover:shadow-indigo-200 hover:shadow-md"
+                disabled={isSubmitting}
+                className="cursor-pointer mt-2 w-full rounded-full bg-indigo-600 py-3 text-sm font-bold text-white uppercase tracking-wider shadow-lg hover:bg-indigo-700 active:scale-98 transition-all hover:shadow-indigo-200 hover:shadow-md disabled:opacity-50"
               >
-                Login
+                {isSubmitting ? 'Logging in...' : 'Login'}
               </button>
             </form>
 

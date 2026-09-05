@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export default function Sidebar({ isOpen, setIsOpen }) {
-  const { currentUser, userRole } = useUser();
+  const { currentUser, userRole, logout } = useUser();
   const navigate = useNavigate();
 
   const menuItems = [
@@ -29,6 +29,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
   ];
 
   const handleLogout = () => {
+    logout();
     navigate('/login');
     if (setIsOpen) setIsOpen(false);
   };
@@ -64,12 +65,12 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         {/* User Card */}
         <div className="flex items-center gap-3 border-b border-slate-100 px-6 py-4">
           <img 
-            src={currentUser.avatar} 
-            alt={currentUser.name} 
+            src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
+            alt={currentUser?.name || 'Acadrium User'} 
             className="h-10 w-10 rounded-full border border-indigo-100 object-cover"
           />
           <div className="overflow-hidden">
-            <h3 className="truncate text-sm font-bold text-slate-800 uppercase tracking-tight">{currentUser.name}</h3>
+            <h3 className="truncate text-sm font-bold text-slate-800 uppercase tracking-tight">{currentUser?.name || (userRole === 'faculty' ? 'Faculty User' : 'Student User')}</h3>
             <p className="text-xs font-medium text-indigo-650 capitalize">{userRole} Account</p>
           </div>
         </div>

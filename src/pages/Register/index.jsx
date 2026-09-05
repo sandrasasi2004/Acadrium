@@ -15,10 +15,11 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!username.trim() || !email.trim()) {
+    if (!username.trim() || !email.trim() || !password.trim()) {
       setError('Please fill in all required fields');
       return;
     }
@@ -27,8 +28,14 @@ export default function Register() {
       return;
     }
     setError('');
-    register(role, username, email);
-    navigate('/dashboard');
+    setIsSubmitting(true);
+    const result = await register(role, username, email, password);
+    setIsSubmitting(false);
+    if (result.success) {
+      navigate('/dashboard');
+    } else {
+      setError(result.error || 'Registration failed. Email or username may already be registered.');
+    }
   };
 
   return (
@@ -181,9 +188,10 @@ export default function Register() {
               {/* SIGN UP BUTTON */}
               <button
                 type="submit"
-                className="cursor-pointer mt-4 w-full rounded-full bg-indigo-600 py-3 text-sm font-bold text-white uppercase tracking-wider shadow-lg hover:bg-indigo-700 active:scale-98 transition-all hover:shadow-indigo-200 hover:shadow-md"
+                disabled={isSubmitting}
+                className="cursor-pointer mt-4 w-full rounded-full bg-indigo-600 py-3 text-sm font-bold text-white uppercase tracking-wider shadow-lg hover:bg-indigo-700 active:scale-98 transition-all hover:shadow-indigo-200 hover:shadow-md disabled:opacity-50"
               >
-                Sign Up
+                {isSubmitting ? 'Signing Up...' : 'Sign Up'}
               </button>
             </form>
 

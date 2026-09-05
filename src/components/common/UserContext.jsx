@@ -1,21 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import * as api from '../../services/api';
 
 const UserContext = createContext();
 
 export function UserProvider({ children }) {
+  // Token state from localStorage
+  const [token, setToken] = useState(() => localStorage.getItem('token') || null);
+  
   // Application role & active user state
   const [userRole, setUserRole] = useState('student');
-  
-  const [currentUser, setCurrentUser] = useState({
-    id: 'usr_default',
-    name: 'Acadrium User',
-    email: 'user@acadrium.edu',
-    department: 'Academic Department',
-    semester: 'Semester II',
-    role: 'student',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'
-  });
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Empty data arrays ready for backend integration
   const [classrooms, setClassrooms] = useState([]);
@@ -30,7 +25,7 @@ export function UserProvider({ children }) {
   const [facultyUploads, setFacultyUploads] = useState([]);
 
   // Data Loading & Error States
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Global Toast state
@@ -43,81 +38,121 @@ export function UserProvider({ children }) {
     }, 3000);
   };
 
-  // Initial load simulation via central API layer
+  // Restore authenticated session via /api/auth/me on mount or token change
   useEffect(() => {
     let isMounted = true;
-    async function loadInitialData() {
+    async function restoreSession() {
+      const storedToken = localStorage.getItem('token');
+      if (!storedToken) {
+        if (isMounted) {
+          setCurrentUser(null);
+          setIsLoading(false);
+        }
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
-      try {
-        const [clsRes, resRes, annRes] = await Promise.all([
-          api.listClassrooms(),
-          api.listResources(),
-          api.listAnnouncements()
-        ]);
-
-        if (isMounted) {
+      
+      const profileRes = await api.getProfile();
+      if (isMounted) {
+        if (profileRes.success && profileRes.data) {
+          const userObj = profileRes.data;
+          setCurrentUser(userObj);
+          setUserRole(userObj.role || 'student');
+          
+          // Optionally fetch initial classroom data once authenticated
+          const [clsRes, resRes, annRes] = await Promise.all([
+            api.listClassrooms(),
+            api.listResources(),
+            api.listAnnouncements()
+          ]);
           if (clsRes.success) setClassrooms(clsRes.data || []);
           if (resRes.success) setResources(resRes.data || []);
           if (annRes.success) setAnnouncements(annRes.data || []);
+        } else {
+          // Token expired or invalid -> logout session
+          localStorage.removeItem('token');
+          setToken(null);
+          setCurrentUser(null);
         }
-      } catch (err) {
-        if (isMounted) {
-          setError(err?.message || 'Failed to sync initial data from API service.');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       }
     }
 
-    loadInitialData();
+    restoreSession();
     return () => { isMounted = false; };
-  }, []);
+  }, [token]);
 
   // Computed Workspace States based on active role
   const myNotes = userRole === 'faculty' ? facultyNotes : studentNotes;
   const myUploads = userRole === 'faculty' ? facultyUploads : studentUploads;
 
-  // Actions wired to API Service Layer
-  const login = async (role, username, password = '') => {
+  // Real Authentication Actions
+  const login = async (role, username, password) => {
     setIsLoading(true);
-    setUserRole(role);
+    setError(null);
     const res = await api.login({ role, username, password });
     setIsLoading(false);
     
-    if (res.success && res.data?.user) {
-      setCurrentUser(res.data.user);
-      showToast(`Logged in successfully as ${role === 'faculty' ? 'Faculty User' : 'Student User'}`, 'success');
+    if (res.success && res.data?.token) {
+      const newToken = res.data.token;
+      const userObj = res.data.user;
+
+      localStorage.setItem('token', newToken);
+      setToken(newToken);
+      setCurrentUser(userObj);
+      setUserRole(userObj.role || role);
+      showToast(`Logged in successfully as ${userObj.name || (role === 'faculty' ? 'Faculty User' : 'Student User')}`, 'success');
       return { success: true };
     } else {
-      showToast(res.error || 'Login failed', 'error');
-      return { success: false, error: res.error };
+      const errorMsg = res.error || 'Login failed. Invalid credentials.';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
+      return { success: false, error: errorMsg };
     }
   };
 
-  const register = async (role, username, email, password = '') => {
+  const register = async (role, username, email, password) => {
     setIsLoading(true);
-    setUserRole(role);
+    setError(null);
     const res = await api.register({ role, username, email, password });
     setIsLoading(false);
 
-    if (res.success && res.data?.user) {
-      setCurrentUser(res.data.user);
-      showToast('Registration completed!', 'success');
+    if (res.success && res.data?.token) {
+      const newToken = res.data.token;
+      const userObj = res.data.user;
+
+      localStorage.setItem('token', newToken);
+      setToken(newToken);
+      setCurrentUser(userObj);
+      setUserRole(userObj.role || role);
+      showToast('Registration completed successfully!', 'success');
       return { success: true };
     } else {
-      showToast(res.error || 'Registration failed', 'error');
-      return { success: false, error: res.error };
+      const errorMsg = res.error || 'Registration failed. Email may be taken.';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
+      return { success: false, error: errorMsg };
     }
   };
 
+  const logout = () => {
+    localStorage.removeItem('token');
+    setToken(null);
+    setCurrentUser(null);
+    setClassrooms([]);
+    setResources([]);
+    setAnnouncements([]);
+    setAiChats([]);
+    showToast('Logged out successfully', 'info');
+  };
+
   const updateProfileAvatar = (avatarUrl) => {
-    setCurrentUser(prev => ({
+    setCurrentUser(prev => prev ? ({
       ...prev,
       avatar: avatarUrl
-    }));
+    }) : null);
     showToast('Profile picture updated!', 'success');
   };
 
@@ -321,6 +356,7 @@ export function UserProvider({ children }) {
 
   return (
     <UserContext.Provider value={{
+      token,
       userRole,
       currentUser,
       setCurrentUser,
@@ -336,6 +372,7 @@ export function UserProvider({ children }) {
       showToast,
       login,
       register,
+      logout,
       updateProfileAvatar,
       createClassroom,
       joinClassroom,
@@ -352,6 +389,19 @@ export function UserProvider({ children }) {
       updateNote,
       deleteNote
     }}>
+      {/* GLOBAL TOAST ALERTS FOR ALL PAGES */}
+      {toast && (
+        <div className="fixed top-5 right-5 z-100 flex items-center gap-3 rounded-2xl bg-white border border-slate-200 px-4 py-3 shadow-2xl transition-all animate-in fade-in slide-in-from-top-5 duration-300">
+          {toast.type === 'error' ? (
+            <AlertCircle className="h-5 w-5 text-rose-500 shrink-0" />
+          ) : toast.type === 'info' ? (
+            <Info className="h-5 w-5 text-indigo-500 shrink-0" />
+          ) : (
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+          )}
+          <span className="text-xs font-bold text-slate-800">{toast.message}</span>
+        </div>
+      )}
       {children}
     </UserContext.Provider>
   );
