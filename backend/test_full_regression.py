@@ -152,4 +152,10 @@ def run_regression_test():
     print("=" * 60)
 
 if __name__ == "__main__":
-    run_regression_test()
+    from cleanup_test_data import run_cleanup
+    try:
+        run_regression_test()
+    finally:
+        print("\n[TEARDOWN] Cleaning up full regression test data...")
+        run_cleanup(dry_run=False)
+

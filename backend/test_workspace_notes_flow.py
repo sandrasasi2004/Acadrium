@@ -114,4 +114,10 @@ def test_workspace_notes_flow():
     print("\n--- ALL WORKSPACE NOTES TESTS PASSED PERFECTLY ---")
 
 if __name__ == "__main__":
-    test_workspace_notes_flow()
+    from cleanup_test_data import run_cleanup
+    try:
+        test_workspace_notes_flow()
+    finally:
+        print("\n[TEARDOWN] Cleaning up workspace notes flow test data...")
+        run_cleanup(dry_run=False)
+

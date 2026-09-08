@@ -40,6 +40,9 @@ def create_announcement(db: Session, current_user: User, data: AnnouncementCreat
     announcement = Announcement(
         title=data.title.strip(),
         content=data.content.strip(),
+        announcement_type=data.announcement_type or "GENERAL",
+        author_name=current_user.full_name,
+        classroom_name=classroom.name,
         classroom_id=classroom_uuid,
         posted_by=current_user.id
     )
@@ -47,6 +50,22 @@ def create_announcement(db: Session, current_user: User, data: AnnouncementCreat
     db.add(announcement)
     db.commit()
     db.refresh(announcement)
+
+    try:
+        from app.services import timeline_service
+        timeline_service.create_event(
+            db=db,
+            event_type="ANNOUNCEMENT_CREATED",
+            title=f"Announcement Posted: {announcement.title}",
+            description=announcement.content,
+            entity_id=str(announcement.id),
+            classroom_id=str(classroom.id),
+            user_id=str(current_user.id),
+            metadata_dict={"announcement_type": announcement.announcement_type}
+        )
+    except Exception as e:
+        print(f"[Timeline Event Warning] Failed to log ANNOUNCEMENT_CREATED event: {e}")
+
     logger.info(f"[Announcement Service] Created announcement '{announcement.title}' (ID: {announcement.id}) in classroom '{classroom.name}'")
     return announcement.to_dict()
 
@@ -142,9 +161,27 @@ def update_announcement(db: Session, current_user: User, announcement_id_str: st
         announcement.title = data.title.strip()
     if data.content is not None and data.content.strip():
         announcement.content = data.content.strip()
+    if data.announcement_type is not None:
+        announcement.announcement_type = data.announcement_type
 
     db.commit()
     db.refresh(announcement)
+
+    try:
+        from app.services import timeline_service
+        timeline_service.create_event(
+            db=db,
+            event_type="ANNOUNCEMENT_UPDATED",
+            title=f"Announcement Updated: {announcement.title}",
+            description=announcement.content,
+            entity_id=str(announcement.id),
+            classroom_id=str(announcement.classroom_id),
+            user_id=str(current_user.id),
+            metadata_dict={"announcement_type": announcement.announcement_type}
+        )
+    except Exception as e:
+        print(f"[Timeline Event Warning] Failed to log ANNOUNCEMENT_UPDATED event: {e}")
+
     logger.info(f"[Announcement Service] Updated announcement (ID: {announcement.id})")
     return announcement.to_dict()
 

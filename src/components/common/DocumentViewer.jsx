@@ -26,11 +26,17 @@ export default function DocumentViewer({ file, onClose }) {
   const isImage = typeTag === 'IMAGE' || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext);
   const isPdf = typeTag === 'PDF' || ext === 'pdf';
   const isText = typeTag === 'TXT' || ext === 'txt';
+  const isDocx = typeTag === 'DOCX' || ['doc', 'docx'].includes(ext);
+  const isPpt = typeTag === 'PPT' || ['ppt', 'pptx'].includes(ext);
 
   useEffect(() => {
     let isMounted = true;
     async function loadFileBlob() {
       if (!file?.id) return;
+      if (isDocx || isPpt) {
+        setIsLoadingFile(false);
+        return;
+      }
       setIsLoadingFile(true);
       setPreviewError(null);
 
@@ -64,7 +70,7 @@ export default function DocumentViewer({ file, onClose }) {
         URL.revokeObjectURL(blobUrl);
       }
     };
-  }, [file?.id]);
+  }, [file?.id, isDocx, isPpt]);
 
   if (!file) return null;
 
@@ -88,6 +94,46 @@ export default function DocumentViewer({ file, onClose }) {
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent mb-4"></div>
           <p className="text-xs font-bold text-slate-700">Fetching document preview stream...</p>
           <p className="text-[11px] text-slate-400 mt-1">Loading secure physical file from server</p>
+        </div>
+      );
+    }
+
+    if (isDocx) {
+      return (
+        <div className="flex flex-col items-center justify-center p-8 text-center my-4 space-y-4">
+          <div className="p-8 rounded-2xl bg-indigo-50/80 border border-indigo-100 text-center max-w-md shadow-xs">
+            <FileText className="h-12 w-12 text-indigo-600 mx-auto mb-3" />
+            <h4 className="text-sm font-bold text-slate-800">{filename}</h4>
+            <p className="text-xs font-semibold text-slate-600 mt-2">
+              Preview is not supported for DOCX files.
+            </p>
+            <button
+              onClick={handleDownload}
+              className="cursor-pointer mt-5 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-indigo-700 transition-all"
+            >
+              <Download className="h-4 w-4" /> Download File
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (isPpt) {
+      return (
+        <div className="flex flex-col items-center justify-center p-8 text-center my-4 space-y-4">
+          <div className="p-8 rounded-2xl bg-amber-50/80 border border-amber-100 text-center max-w-md shadow-xs">
+            <FileText className="h-12 w-12 text-amber-600 mx-auto mb-3" />
+            <h4 className="text-sm font-bold text-slate-800">{filename}</h4>
+            <p className="text-xs font-semibold text-slate-600 mt-2">
+              Preview is not supported for PowerPoint files.
+            </p>
+            <button
+              onClick={handleDownload}
+              className="cursor-pointer mt-5 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-indigo-700 transition-all"
+            >
+              <Download className="h-4 w-4" /> Download File
+            </button>
+          </div>
         </div>
       );
     }

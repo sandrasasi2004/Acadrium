@@ -61,7 +61,8 @@ export default function Resources() {
     const ext = file.name.split('.').pop().toLowerCase();
     if (['ppt', 'pptx'].includes(ext)) return 'PPT';
     if (['doc', 'docx'].includes(ext)) return 'DOCX';
-    if (['png', 'jpg', 'jpeg'].includes(ext)) return 'IMAGE';
+    if (['txt'].includes(ext)) return 'TXT';
+    if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return 'IMAGE';
     return 'PDF';
   };
 
@@ -229,6 +230,7 @@ export default function Resources() {
                 <tr>
                   <th className="px-6 py-4">Resource Details</th>
                   <th className="px-6 py-4">Classroom</th>
+                  <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4">Uploaded Date</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
@@ -240,6 +242,10 @@ export default function Resources() {
                   const classroomName = res.classroom_name || res.classroomName || 'Classroom';
                   const createdDate = res.created_at ? new Date(res.created_at).toLocaleDateString() : (res.uploadedDate || 'N/A');
                   const formattedSize = getFileSizeString(res.file_size || res.size);
+
+                  const statusVal = (res.extraction_status || 'COMPLETED').toUpperCase();
+                  const isProcessing = statusVal === 'PENDING' || statusVal === 'PROCESSING';
+                  const isFailed = statusVal === 'FAILED';
 
                   return (
                     <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
@@ -268,6 +274,24 @@ export default function Resources() {
                         <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-700">
                           {classroomName}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {isProcessing ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 border border-amber-200">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                            Processing...
+                          </span>
+                        ) : isFailed ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-rose-700 border border-rose-200">
+                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                            Failed
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Processed
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-slate-500 font-medium">{createdDate}</td>
                       <td className="px-6 py-4 text-right space-x-2">
@@ -349,7 +373,7 @@ export default function Resources() {
                     id="resource-file-input"
                     onChange={handleFileChange}
                     className="hidden"
-                    accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg"
+                    accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.webp"
                   />
                   <label
                     htmlFor="resource-file-input"

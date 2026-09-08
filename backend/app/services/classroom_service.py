@@ -51,6 +51,24 @@ def create_classroom(db: Session, classroom_in: ClassroomCreate, faculty_user: U
     db.add(classroom)
     db.commit()
     db.refresh(classroom)
+
+    try:
+        from app.services import timeline_service
+        timeline_service.create_event(
+            db=db,
+            event_type="CLASSROOM_CREATED",
+            title=f"Classroom Created: {classroom.name}",
+            entity_id=str(classroom.id),
+            classroom_id=str(classroom.id),
+            user_id=str(faculty_user.id),
+            metadata_dict={
+                "class_code": classroom.class_code,
+                "subject_code": classroom.subject_code
+            }
+        )
+    except Exception as e:
+        print(f"[Timeline Event Warning] Failed to log CLASSROOM_CREATED event: {e}")
+
     return classroom
 
 def get_faculty_classrooms(db: Session, faculty_id: str) -> List[Classroom]:
@@ -142,6 +160,23 @@ def join_classroom(db: Session, join_in: ClassroomJoin, student_user: User) -> C
     db.add(membership)
     db.commit()
     db.refresh(classroom)
+
+    try:
+        from app.services import timeline_service
+        timeline_service.create_event(
+            db=db,
+            event_type="CLASSROOM_JOINED",
+            title=f"Joined Classroom: {classroom.name}",
+            entity_id=str(classroom.id),
+            classroom_id=str(classroom.id),
+            user_id=str(student_user.id),
+            metadata_dict={
+                "class_code": classroom.class_code
+            }
+        )
+    except Exception as e:
+        print(f"[Timeline Event Warning] Failed to log CLASSROOM_JOINED event: {e}")
+
     return classroom
 
 def leave_classroom(db: Session, classroom_id: str, student_user: User):

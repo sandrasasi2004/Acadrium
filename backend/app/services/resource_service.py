@@ -20,9 +20,11 @@ ALLOWED_EXTENSIONS = {
     "pptx": {"category": "ppt", "file_type": "PPT", "default_mime": "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
     "doc": {"category": "doc", "file_type": "DOCX", "default_mime": "application/msword"},
     "docx": {"category": "doc", "file_type": "DOCX", "default_mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+    "txt": {"category": "doc", "file_type": "TXT", "default_mime": "text/plain"},
     "png": {"category": "images", "file_type": "IMAGE", "default_mime": "image/png"},
     "jpg": {"category": "images", "file_type": "IMAGE", "default_mime": "image/jpeg"},
-    "jpeg": {"category": "images", "file_type": "IMAGE", "default_mime": "image/jpeg"}
+    "jpeg": {"category": "images", "file_type": "IMAGE", "default_mime": "image/jpeg"},
+    "webp": {"category": "images", "file_type": "IMAGE", "default_mime": "image/webp"}
 }
 
 def ensure_storage_directories():
@@ -126,12 +128,35 @@ def upload_resource(
         file_path=full_path,
         classroom_id=classroom.id,
         uploaded_by=current_user.id,
-        extraction_status="pending"
+        uploaded_by_name=current_user.full_name,
+        classroom_name=classroom.name,
+        extraction_status="PENDING"
     )
 
     db.add(resource)
     db.commit()
     db.refresh(resource)
+
+    # 7. Log RESOURCE_UPLOADED timeline event
+    try:
+        from app.services import timeline_service
+        timeline_service.create_event(
+            db=db,
+            event_type="RESOURCE_UPLOADED",
+            title=f"Resource Uploaded: {resource.title}",
+            description=resource.description,
+            entity_id=str(resource.id),
+            classroom_id=str(classroom.id),
+            user_id=str(current_user.id),
+            metadata_dict={
+                "filename": resource.original_filename,
+                "file_type": resource.file_type,
+                "file_size": resource.file_size
+            }
+        )
+    except Exception as e:
+        print(f"[Timeline Event Warning] Failed to log RESOURCE_UPLOADED event: {e}")
+
     return resource
 
 def list_user_resources(db: Session, current_user: User) -> List[Resource]:

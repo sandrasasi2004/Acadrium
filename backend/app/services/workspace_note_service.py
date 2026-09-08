@@ -6,16 +6,38 @@ from app.models.user import User
 from app.models.workspace_note import WorkspaceNote
 from app.schemas.workspace_note import WorkspaceNoteCreate, WorkspaceNoteUpdate
 
+from datetime import datetime, timezone
+
 def create_note(db: Session, note_data: WorkspaceNoteCreate, current_user: User) -> WorkspaceNote:
     """Create a private workspace note for current user."""
+    content_str = note_data.content.strip() if note_data.content else ""
+    w_count = len(content_str.split())
+    now_dt = datetime.now(timezone.utc)
+
     note = WorkspaceNote(
         title=note_data.title.strip(),
-        content=note_data.content.strip() if note_data.content else "",
-        owner_id=current_user.id
+        content=content_str,
+        owner_id=current_user.id,
+        word_count=w_count,
+        last_modified_at=now_dt
     )
     db.add(note)
     db.commit()
     db.refresh(note)
+
+    try:
+        from app.services import timeline_service
+        timeline_service.create_event(
+            db=db,
+            event_type="NOTE_CREATED",
+            title=f"Note Created: {note.title}",
+            entity_id=str(note.id),
+            user_id=str(current_user.id),
+            metadata_dict={"word_count": note.word_count}
+        )
+    except Exception as e:
+        print(f"[Timeline Event Warning] Failed to log NOTE_CREATED event: {e}")
+
     return note
 
 def list_notes(db: Session, current_user: User) -> List[WorkspaceNote]:
@@ -50,8 +72,25 @@ def update_note(db: Session, note_id: str, note_data: WorkspaceNoteUpdate, curre
     if note_data.content is not None:
         note.content = note_data.content.strip()
 
+    note.word_count = len((note.content or "").split())
+    note.last_modified_at = datetime.now(timezone.utc)
+
     db.commit()
     db.refresh(note)
+
+    try:
+        from app.services import timeline_service
+        timeline_service.create_event(
+            db=db,
+            event_type="NOTE_UPDATED",
+            title=f"Note Updated: {note.title}",
+            entity_id=str(note.id),
+            user_id=str(current_user.id),
+            metadata_dict={"word_count": note.word_count}
+        )
+    except Exception as e:
+        print(f"[Timeline Event Warning] Failed to log NOTE_UPDATED event: {e}")
+
     return note
 
 def delete_note(db: Session, note_id: str, current_user: User) -> dict:

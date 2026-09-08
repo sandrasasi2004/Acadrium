@@ -17,9 +17,11 @@ ALLOWED_EXTENSIONS = {
     "pptx": {"category": "ppt", "file_type": "PPT", "default_mime": "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
     "doc": {"category": "doc", "file_type": "DOC", "default_mime": "application/msword"},
     "docx": {"category": "doc", "file_type": "DOC", "default_mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+    "txt": {"category": "doc", "file_type": "TXT", "default_mime": "text/plain"},
     "png": {"category": "images", "file_type": "IMAGE", "default_mime": "image/png"},
     "jpg": {"category": "images", "file_type": "IMAGE", "default_mime": "image/jpeg"},
-    "jpeg": {"category": "images", "file_type": "IMAGE", "default_mime": "image/jpeg"}
+    "jpeg": {"category": "images", "file_type": "IMAGE", "default_mime": "image/jpeg"},
+    "webp": {"category": "images", "file_type": "IMAGE", "default_mime": "image/webp"}
 }
 
 def ensure_workspace_directories():
@@ -84,12 +86,33 @@ def upload_workspace_file(
         mime_type=mime_type,
         file_size=file_size_bytes,
         file_path=full_path,
-        owner_id=current_user.id
+        owner_id=current_user.id,
+        owner_name=current_user.full_name,
+        extraction_status="PENDING"
     )
 
     db.add(workspace_res)
     db.commit()
     db.refresh(workspace_res)
+
+    try:
+        from app.services import timeline_service
+        timeline_service.create_event(
+            db=db,
+            event_type="WORKSPACE_FILE_UPLOADED",
+            title=f"Workspace File Uploaded: {workspace_res.title}",
+            description=workspace_res.description,
+            entity_id=str(workspace_res.id),
+            user_id=str(current_user.id),
+            metadata_dict={
+                "filename": workspace_res.original_filename,
+                "file_type": workspace_res.file_type,
+                "file_size": workspace_res.file_size
+            }
+        )
+    except Exception as e:
+        print(f"[Timeline Event Warning] Failed to log WORKSPACE_FILE_UPLOADED event: {e}")
+
     return workspace_res
 
 def list_workspace_files(db: Session, current_user: User) -> List[WorkspaceResource]:

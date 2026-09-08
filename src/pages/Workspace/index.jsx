@@ -316,6 +316,7 @@ export default function Workspace() {
                       <tr>
                         <th className="px-6 py-4">File Name</th>
                         <th className="px-6 py-4">Type</th>
+                        <th className="px-6 py-4">Status</th>
                         <th className="px-6 py-4">Uploaded Date</th>
                         <th className="px-6 py-4 text-right">Actions</th>
                       </tr>
@@ -325,6 +326,10 @@ export default function Workspace() {
                         const typeTag = doc.file_type || doc.type || 'PDF';
                         const createdDate = doc.created_at ? new Date(doc.created_at).toLocaleDateString() : (doc.uploadedDate || 'N/A');
                         const formattedSize = getFileSizeString(doc.file_size || doc.size);
+
+                        const statusVal = (doc.extraction_status || 'COMPLETED').toUpperCase();
+                        const isProcessing = statusVal === 'PENDING' || statusVal === 'PROCESSING';
+                        const isFailed = statusVal === 'FAILED';
 
                         return (
                           <tr key={doc.id} className="hover:bg-slate-50/50 transition-colors">
@@ -350,6 +355,24 @@ export default function Workspace() {
                               </div>
                             </td>
                             <td className="px-6 py-4 font-bold text-slate-500">{typeTag}</td>
+                            <td className="px-6 py-4">
+                              {isProcessing ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 border border-amber-200">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                  Processing...
+                                </span>
+                              ) : isFailed ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-rose-700 border border-rose-200">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                                  Failed
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                  Processed
+                                </span>
+                              )}
+                            </td>
                             <td className="px-6 py-4 text-slate-500">{createdDate}</td>
                             <td className="px-6 py-4 text-right space-x-2">
                               <button 

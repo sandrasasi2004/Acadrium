@@ -141,4 +141,10 @@ def test_announcement_flow():
     print("\n--- ALL PHASE 5 ANNOUNCEMENT FLOW TESTS PASSED SUCCESSFULLY! ---\n")
 
 if __name__ == "__main__":
-    test_announcement_flow()
+    from cleanup_test_data import run_cleanup
+    try:
+        test_announcement_flow()
+    finally:
+        print("\n[TEARDOWN] Cleaning up announcement flow test data...")
+        run_cleanup(dry_run=False)
+

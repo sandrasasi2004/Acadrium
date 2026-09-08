@@ -243,6 +243,11 @@ export async function getResource(resourceId) {
   return res;
 }
 
+export async function getResourceExtractionStatus(resourceId) {
+  const res = await fetchApi(`/resources/${resourceId}/extraction-status`, { method: 'GET' });
+  return res;
+}
+
 export async function uploadResource(formData) {
   const url = `${API_BASE_URL}/resources/upload`;
   const headers = getAuthHeaders(); // Do NOT set Content-Type header so browser sets boundary for FormData
@@ -328,6 +333,11 @@ export async function listWorkspaceFiles(params = {}) {
 
 export async function getWorkspaceFile(fileId) {
   const res = await fetchApi(`/workspace/${fileId}`, { method: 'GET' });
+  return res;
+}
+
+export async function getWorkspaceExtractionStatus(fileId) {
+  const res = await fetchApi(`/workspace/${fileId}/extraction-status`, { method: 'GET' });
   return res;
 }
 

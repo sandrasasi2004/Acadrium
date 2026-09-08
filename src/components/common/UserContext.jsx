@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import * as api from '../../services/api';
 
@@ -28,6 +28,86 @@ export function UserProvider({ children }) {
 
   // Global Toast state
   const [toast, setToast] = useState(null);
+
+  // Live polling timers for extraction status
+  const resourceTimersRef = useRef({});
+  const workspaceTimersRef = useRef({});
+
+  useEffect(() => {
+    // Poll classroom resources with status PENDING or PROCESSING
+    resources.forEach(res => {
+      const status = (res.extraction_status || '').toUpperCase();
+      const isPending = status === 'PENDING' || status === 'PROCESSING';
+
+      if (isPending && !resourceTimersRef.current[res.id]) {
+        const timer = setInterval(async () => {
+          const statusRes = await api.getResourceExtractionStatus(res.id);
+          if (statusRes.success && statusRes.data?.status) {
+            const newStatus = statusRes.data.status.toUpperCase();
+            if (newStatus === 'COMPLETED' || newStatus === 'FAILED') {
+              if (resourceTimersRef.current[res.id]) {
+                clearInterval(resourceTimersRef.current[res.id]);
+                delete resourceTimersRef.current[res.id];
+              }
+
+              const fullRes = await api.getResource(res.id);
+              if (fullRes.success && fullRes.data) {
+                setResources(prev => prev.map(item => item.id === res.id ? fullRes.data : item));
+              } else {
+                setResources(prev => prev.map(item => item.id === res.id ? { ...item, extraction_status: newStatus } : item));
+              }
+            } else if (newStatus !== status) {
+              setResources(prev => prev.map(item => item.id === res.id ? { ...item, extraction_status: newStatus } : item));
+            }
+          }
+        }, 2500);
+
+        resourceTimersRef.current[res.id] = timer;
+      }
+    });
+
+    // Poll workspace files with status PENDING or PROCESSING
+    workspaceFiles.forEach(doc => {
+      const status = (doc.extraction_status || '').toUpperCase();
+      const isPending = status === 'PENDING' || status === 'PROCESSING';
+
+      if (isPending && !workspaceTimersRef.current[doc.id]) {
+        const timer = setInterval(async () => {
+          const statusRes = await api.getWorkspaceExtractionStatus(doc.id);
+          if (statusRes.success && statusRes.data?.status) {
+            const newStatus = statusRes.data.status.toUpperCase();
+            if (newStatus === 'COMPLETED' || newStatus === 'FAILED') {
+              if (workspaceTimersRef.current[doc.id]) {
+                clearInterval(workspaceTimersRef.current[doc.id]);
+                delete workspaceTimersRef.current[doc.id];
+              }
+
+              const fullDoc = await api.getWorkspaceFile(doc.id);
+              if (fullDoc.success && fullDoc.data) {
+                setWorkspaceFiles(prev => prev.map(item => item.id === doc.id ? fullDoc.data : item));
+              } else {
+                setWorkspaceFiles(prev => prev.map(item => item.id === doc.id ? { ...item, extraction_status: newStatus } : item));
+              }
+            } else if (newStatus !== status) {
+              setWorkspaceFiles(prev => prev.map(item => item.id === doc.id ? { ...item, extraction_status: newStatus } : item));
+            }
+          }
+        }, 2500);
+
+        workspaceTimersRef.current[doc.id] = timer;
+      }
+    });
+  }, [resources, workspaceFiles]);
+
+  // Clean up all active extraction polling timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(resourceTimersRef.current).forEach(clearInterval);
+      Object.values(workspaceTimersRef.current).forEach(clearInterval);
+      resourceTimersRef.current = {};
+      workspaceTimersRef.current = {};
+    };
+  }, []);
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -328,6 +408,11 @@ export function UserProvider({ children }) {
     const res = await api.uploadResource(formData);
     if (res.success && res.data) {
       showToast('Resource uploaded successfully!', 'success');
+      setResources(prev => {
+        const exists = prev.some(r => r.id === res.data.id);
+        if (exists) return prev.map(r => r.id === res.data.id ? res.data : r);
+        return [res.data, ...prev];
+      });
       await loadResources();
       return { success: true, data: res.data };
     }
@@ -353,13 +438,14 @@ export function UserProvider({ children }) {
     const res = await api.deleteResource(id);
     if (res.success) {
       setResources(prev => prev.filter(r => r.id !== id));
+      await loadResources();
       showToast('Resource deleted successfully', 'success');
       return { success: true };
     }
     const errorMsg = res.error || 'Failed to delete resource';
     showToast(errorMsg, 'error');
     return { success: false, error: errorMsg };
-  }, [showToast]);
+  }, [loadResources, showToast]);
 
   // Workspace Files Actions (PostgreSQL Backed)
   const loadWorkspaceFiles = useCallback(async (params = {}) => {
@@ -375,6 +461,11 @@ export function UserProvider({ children }) {
     const res = await api.uploadWorkspaceFile(formData);
     if (res.success && res.data) {
       showToast('Workspace file uploaded successfully!', 'success');
+      setWorkspaceFiles(prev => {
+        const exists = prev.some(f => f.id === res.data.id);
+        if (exists) return prev.map(f => f.id === res.data.id ? res.data : f);
+        return [res.data, ...prev];
+      });
       await loadWorkspaceFiles();
       return { success: true, data: res.data };
     }
@@ -387,13 +478,14 @@ export function UserProvider({ children }) {
     const res = await api.deleteWorkspaceFile(id);
     if (res.success) {
       setWorkspaceFiles(prev => prev.filter(f => f.id !== id));
+      await loadWorkspaceFiles();
       showToast('Workspace file deleted successfully', 'success');
       return { success: true };
     }
     const errorMsg = res.error || 'Failed to delete workspace file';
     showToast(errorMsg, 'error');
     return { success: false, error: errorMsg };
-  }, [showToast]);
+  }, [loadWorkspaceFiles, showToast]);
 
   // Workspace Notes Actions (PostgreSQL Backed)
   const loadWorkspaceNotes = useCallback(async (params = {}) => {

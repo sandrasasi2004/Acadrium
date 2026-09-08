@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 class AnnouncementBase(BaseModel):
     title: str = Field(..., max_length=255)
     content: str
+    announcement_type: Optional[str] = Field("GENERAL", description="Allowed: GENERAL, ACADEMIC, EXAM, ASSIGNMENT, NOTICE, EVENT")
 
 class AnnouncementCreate(AnnouncementBase):
     classroom_id: str
@@ -21,11 +22,13 @@ class AnnouncementCreate(AnnouncementBase):
 class AnnouncementUpdate(BaseModel):
     title: Optional[str] = Field(None, max_length=255)
     content: Optional[str] = None
+    announcement_type: Optional[str] = None
 
 class AnnouncementResponse(BaseModel):
     id: str
     title: str
     content: str
+    announcement_type: Optional[str] = "GENERAL"
     classroom_id: str
     classroomId: Optional[str] = None
     classroom_name: Optional[str] = "General"

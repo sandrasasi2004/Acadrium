@@ -215,4 +215,10 @@ def run_tests():
     print("=" * 60)
 
 if __name__ == "__main__":
-    run_tests()
+    from cleanup_test_data import run_cleanup
+    try:
+        run_tests()
+    finally:
+        print("\n[TEARDOWN] Cleaning up classroom flow test data...")
+        run_cleanup(dry_run=False)
+

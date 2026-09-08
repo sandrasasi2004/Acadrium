@@ -19,6 +19,16 @@ class WorkspaceResource(Base):
     file_size = Column(Integer, nullable=False)
     file_path = Column(String(500), nullable=False)
     owner_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    # Phase 7.5 Metadata Expansion
+    owner_name = Column(String(255), nullable=True)
+    page_count = Column(Integer, nullable=True, default=0)
+    word_count = Column(Integer, nullable=True, default=0)
+    last_processed_at = Column(DateTime(timezone=True), nullable=True)
+
+    extraction_status = Column(String(20), nullable=False, default="PENDING")  # PENDING, PROCESSING, COMPLETED, FAILED
+    extracted_text = Column(Text, nullable=True)
+    extraction_error = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
@@ -26,7 +36,7 @@ class WorkspaceResource(Base):
     owner = relationship("User", back_populates="workspace_resources")
 
     def to_dict(self):
-        owner_name = self.owner.full_name if self.owner else "User"
+        owner_name = self.owner_name or (self.owner.full_name if self.owner else "User")
         return {
             "id": str(self.id),
             "title": self.title,
@@ -42,6 +52,12 @@ class WorkspaceResource(Base):
             "file_path": self.file_path,
             "owner_id": str(self.owner_id),
             "owner_name": owner_name,
+            "page_count": self.page_count or 0,
+            "word_count": self.word_count or 0,
+            "last_processed_at": self.last_processed_at.isoformat() if self.last_processed_at else None,
+            "extraction_status": self.extraction_status,
+            "extracted_text": self.extracted_text,
+            "extraction_error": self.extraction_error,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "uploadedDate": self.created_at.strftime("%d %B %Y") if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,

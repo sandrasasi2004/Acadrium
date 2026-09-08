@@ -161,8 +161,9 @@ def test_resource_upload_and_access_flow():
         assert student_delete_resp.status_code == 403, f"Expected 403 for student delete, got {student_delete_resp.status_code}"
         print("[PASS] Security Blocked: Student delete forbidden")
 
-        # 13. Faculty Deletes Resources
-        for res_id in uploaded_resource_ids:
+        # 13. Faculty Deletes Resources and verifies DB record deletion & count decrease
+        initial_res_count = len(client.get(f"/api/resources/classroom/{classroom_id}", headers=faculty_headers).json())
+        for idx, res_id in enumerate(uploaded_resource_ids):
             # Check physical path before delete
             res_details = client.get(f"/api/resources/{res_id}", headers=faculty_headers).json()
             fpath = res_details["file_path"]
@@ -170,7 +171,15 @@ def test_resource_upload_and_access_flow():
             del_resp = client.delete(f"/api/resources/{res_id}", headers=faculty_headers)
             assert del_resp.status_code == 200, f"Faculty delete failed: {del_resp.text}"
             assert not os.path.exists(fpath), f"Physical file still exists after deletion: {fpath}"
-            print(f"[PASS] Faculty deleted resource {res_id} and physical file removed")
+            
+            # Verify 404 on deleted resource metadata
+            get_del_resp = client.get(f"/api/resources/{res_id}", headers=faculty_headers)
+            assert get_del_resp.status_code == 404, f"Expected 404 for deleted resource DB record, got {get_del_resp.status_code}"
+            
+            # Verify list count decreased in PostgreSQL
+            current_res_list = client.get(f"/api/resources/classroom/{classroom_id}", headers=faculty_headers).json()
+            assert len(current_res_list) == initial_res_count - (idx + 1), "DB record count did not decrease after deletion"
+            print(f"[PASS] Faculty deleted resource {res_id}: physical file removed, DB record deleted (404), count decreased to {len(current_res_list)}")
 
     finally:
         # 14. Clean up created test classroom
@@ -180,4 +189,10 @@ def test_resource_upload_and_access_flow():
     print("\n--- ALL PHASE 4 RESOURCE MODULE TESTS PASSED PERFECTLY ---")
 
 if __name__ == "__main__":
-    test_resource_upload_and_access_flow()
+    from cleanup_test_data import run_cleanup
+    try:
+        test_resource_upload_and_access_flow()
+    finally:
+        print("\n[TEARDOWN] Cleaning up resource flow test data...")
+        run_cleanup(dry_run=False)
+

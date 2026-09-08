@@ -155,11 +155,16 @@ def test_workspace_flow():
         assert stu_download_resp.content == b"%PDF-1.4 Private Student Assignment Document"
         print("[PASS] Student Downloaded Own File successfully with exact binary content match")
 
-        # 14. Cleanup Student File
+        # 14. Cleanup Student File & verify DB deletion and count decrease
+        stu_list_before = len(client.get("/api/workspace", headers=stu_headers).json())
         stu_del_resp = client.delete(f"/api/workspace/{stu_file_id}", headers=stu_headers)
         assert stu_del_resp.status_code == 200
         assert not os.path.exists(stu_file_path), "Student physical file still exists after deletion"
-        print(f"[PASS] Student deleted workspace file {stu_file_id} and physical file removed")
+        get_stu_del = client.get(f"/api/workspace/{stu_file_id}", headers=stu_headers)
+        assert get_stu_del.status_code == 404, f"Expected 404 for deleted student workspace file, got {get_stu_del.status_code}"
+        stu_list_after = len(client.get("/api/workspace", headers=stu_headers).json())
+        assert stu_list_after == stu_list_before - 1, "Student workspace DB count did not decrease after deletion"
+        print(f"[PASS] Student deleted workspace file {stu_file_id}: physical file removed, DB record deleted (404), list count decreased")
 
     finally:
         # 15. Cleanup Faculty Files
@@ -172,4 +177,10 @@ def test_workspace_flow():
     print("\n--- ALL PHASE 6 PERSONAL WORKSPACE TESTS PASSED PERFECTLY ---")
 
 if __name__ == "__main__":
-    test_workspace_flow()
+    from cleanup_test_data import run_cleanup
+    try:
+        test_workspace_flow()
+    finally:
+        print("\n[TEARDOWN] Cleaning up workspace flow test data...")
+        run_cleanup(dry_run=False)
+

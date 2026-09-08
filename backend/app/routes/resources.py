@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -7,11 +7,13 @@ from app.database.session import get_db
 from app.models.user import User
 from app.auth.dependencies import get_current_user, require_faculty
 from app.services import resource_service
+from app.services.document_processor import process_uploaded_resource
 
 router = APIRouter(prefix="/resources", tags=["Resources"])
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 def upload_classroom_resource(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     classroom_id: str = Form(...),
     title: str = Form(...),
@@ -20,7 +22,7 @@ def upload_classroom_resource(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_faculty)
 ):
-    """Upload a resource file (Faculty only)."""
+    """Upload a resource file (Faculty only). Background extraction starts asynchronously."""
     resource = resource_service.upload_resource(
         db=db,
         file=file,
@@ -30,6 +32,7 @@ def upload_classroom_resource(
         tags=tags,
         current_user=current_user
     )
+    background_tasks.add_task(process_uploaded_resource, str(resource.id))
     return resource.to_dict()
 
 @router.get("")
@@ -60,6 +63,16 @@ def get_resource_details(
     """Get metadata for a specific resource."""
     resource = resource_service.get_resource_details(db, resource_id, current_user)
     return resource.to_dict()
+
+@router.get("/{resource_id}/extraction-status")
+def get_resource_extraction_status(
+    resource_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get extraction status for classroom resource."""
+    resource = resource_service.get_resource_details(db, resource_id, current_user)
+    return {"status": resource.extraction_status}
 
 @router.get("/{resource_id}/download")
 def download_resource(
