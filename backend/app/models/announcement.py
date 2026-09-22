@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Date
 from sqlalchemy.orm import relationship
 from app.database.session import Base
 from app.models.user import GUID
@@ -18,6 +18,7 @@ class Announcement(Base):
     announcement_type = Column(String(50), nullable=False, default="GENERAL")
     author_name = Column(String(255), nullable=True)
     classroom_name = Column(String(255), nullable=True)
+    academic_date = Column(Date, nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
@@ -34,6 +35,7 @@ class Announcement(Base):
             "title": self.title,
             "content": self.content,
             "announcement_type": self.announcement_type,
+            "academic_date": self.academic_date.isoformat() if self.academic_date else None,
             "classroom_id": str(self.classroom_id),
             "classroomId": str(self.classroom_id),
             "classroom_name": classroom_name,

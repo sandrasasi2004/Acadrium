@@ -558,8 +558,16 @@ export function UserProvider({ children }) {
     return [];
   }, []);
 
-  const createAnnouncement = useCallback(async (classroomId, title, content) => {
-    const payload = { classroomId, title, content };
+  const createAnnouncement = useCallback(async (classroomId, title, content, academicDate = null) => {
+    let payload;
+    if (typeof classroomId === 'object' && classroomId !== null) {
+      payload = classroomId;
+    } else {
+      payload = { classroomId, title, content };
+      if (academicDate) {
+        payload.academic_date = academicDate;
+      }
+    }
     const res = await api.createAnnouncement(payload);
     if (res.success && res.data) {
       showToast('Announcement published successfully!', 'success');
@@ -573,8 +581,17 @@ export function UserProvider({ children }) {
 
   const addAnnouncement = createAnnouncement;
 
-  const updateAnnouncement = useCallback(async (announcementId, title, content) => {
-    const res = await api.updateAnnouncement(announcementId, { title, content });
+  const updateAnnouncement = useCallback(async (announcementId, title, content, academicDate = undefined) => {
+    let updateData;
+    if (typeof title === 'object' && title !== null) {
+      updateData = title;
+    } else {
+      updateData = { title, content };
+      if (academicDate !== undefined) {
+        updateData.academic_date = academicDate;
+      }
+    }
+    const res = await api.updateAnnouncement(announcementId, updateData);
     if (res.success && res.data) {
       showToast('Announcement updated successfully!', 'success');
       await loadAnnouncements();

@@ -485,6 +485,11 @@ export async function createAnnouncement(announcementData) {
     classroom_id: announcementData.classroom_id || announcementData.classroomId,
   };
 
+  const acadDate = announcementData.academic_date || announcementData.academicDate;
+  if (acadDate && typeof acadDate === 'string' && acadDate.trim() !== '') {
+    payload.academic_date = acadDate.trim();
+  }
+
   const res = await fetchApi('/announcements', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -498,6 +503,15 @@ export async function updateAnnouncement(announcementId, updateData) {
     title: updateData.title,
     content: updateData.content,
   };
+
+  const acadDate = updateData.academic_date !== undefined ? updateData.academic_date : updateData.academicDate;
+  if (acadDate !== undefined) {
+    if (acadDate && typeof acadDate === 'string' && acadDate.trim() !== '') {
+      payload.academic_date = acadDate.trim();
+    } else if (acadDate === null || acadDate === '') {
+      payload.academic_date = null;
+    }
+  }
 
   const res = await fetchApi(`/announcements/${announcementId}`, {
     method: 'PUT',

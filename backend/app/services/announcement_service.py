@@ -41,6 +41,7 @@ def create_announcement(db: Session, current_user: User, data: AnnouncementCreat
         title=data.title.strip(),
         content=data.content.strip(),
         announcement_type=data.announcement_type or "GENERAL",
+        academic_date=data.academic_date,
         author_name=current_user.full_name,
         classroom_name=classroom.name,
         classroom_id=classroom_uuid,
@@ -53,6 +54,9 @@ def create_announcement(db: Session, current_user: User, data: AnnouncementCreat
 
     try:
         from app.services import timeline_service
+        meta = {"announcement_type": announcement.announcement_type}
+        if announcement.academic_date:
+            meta["academic_date"] = announcement.academic_date.isoformat()
         timeline_service.create_event(
             db=db,
             event_type="ANNOUNCEMENT_CREATED",
@@ -61,7 +65,7 @@ def create_announcement(db: Session, current_user: User, data: AnnouncementCreat
             entity_id=str(announcement.id),
             classroom_id=str(classroom.id),
             user_id=str(current_user.id),
-            metadata_dict={"announcement_type": announcement.announcement_type}
+            metadata_dict=meta
         )
     except Exception as e:
         print(f"[Timeline Event Warning] Failed to log ANNOUNCEMENT_CREATED event: {e}")
@@ -69,7 +73,7 @@ def create_announcement(db: Session, current_user: User, data: AnnouncementCreat
     logger.info(f"[Announcement Service] Created announcement '{announcement.title}' (ID: {announcement.id}) in classroom '{classroom.name}'")
     return announcement.to_dict()
 
-def get_classroom_announcements(db: Session, current_user: User, classroom_id_str: str) -> list:
+def get_classroom_announcements(db: Session, current_user: User, classroom_id_str: str, academic_date: str = None) -> list:
     try:
         classroom_uuid = uuid.UUID(classroom_id_str)
     except ValueError:
@@ -104,13 +108,17 @@ def get_classroom_announcements(db: Session, current_user: User, classroom_id_st
                 detail="Students can only view announcements for enrolled classrooms."
             )
 
-    announcements = db.query(Announcement).filter(
+    query = db.query(Announcement).filter(
         Announcement.classroom_id == classroom_uuid
-    ).order_by(Announcement.created_at.desc()).all()
+    )
+    if academic_date:
+        query = query.filter(Announcement.academic_date == academic_date)
+
+    announcements = query.order_by(Announcement.created_at.desc()).all()
 
     return [a.to_dict() for a in announcements]
 
-def get_user_announcements(db: Session, current_user: User) -> list:
+def get_user_announcements(db: Session, current_user: User, academic_date: str = None) -> list:
     if current_user.role == "faculty":
         # Get all classrooms owned by faculty
         owned_classrooms = db.query(Classroom.id).filter(Classroom.faculty_id == current_user.id).all()
@@ -123,9 +131,13 @@ def get_user_announcements(db: Session, current_user: User) -> list:
     if not classroom_ids:
         return []
 
-    announcements = db.query(Announcement).filter(
+    query = db.query(Announcement).filter(
         Announcement.classroom_id.in_(classroom_ids)
-    ).order_by(Announcement.created_at.desc()).all()
+    )
+    if academic_date:
+        query = query.filter(Announcement.academic_date == academic_date)
+
+    announcements = query.order_by(Announcement.created_at.desc()).all()
 
     return [a.to_dict() for a in announcements]
 
@@ -163,12 +175,17 @@ def update_announcement(db: Session, current_user: User, announcement_id_str: st
         announcement.content = data.content.strip()
     if data.announcement_type is not None:
         announcement.announcement_type = data.announcement_type
+    if "academic_date" in data.model_fields_set:
+        announcement.academic_date = data.academic_date
 
     db.commit()
     db.refresh(announcement)
 
     try:
         from app.services import timeline_service
+        meta = {"announcement_type": announcement.announcement_type}
+        if announcement.academic_date:
+            meta["academic_date"] = announcement.academic_date.isoformat()
         timeline_service.create_event(
             db=db,
             event_type="ANNOUNCEMENT_UPDATED",
@@ -177,7 +194,7 @@ def update_announcement(db: Session, current_user: User, announcement_id_str: st
             entity_id=str(announcement.id),
             classroom_id=str(announcement.classroom_id),
             user_id=str(current_user.id),
-            metadata_dict={"announcement_type": announcement.announcement_type}
+            metadata_dict=meta
         )
     except Exception as e:
         print(f"[Timeline Event Warning] Failed to log ANNOUNCEMENT_UPDATED event: {e}")

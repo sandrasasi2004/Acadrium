@@ -23,18 +23,20 @@ def create_announcement(
 
 @router.get("")
 def list_user_announcements(
+    academic_date: str = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> List[Dict[str, Any]]:
-    return announcement_service.get_user_announcements(db, current_user)
+    return announcement_service.get_user_announcements(db, current_user, academic_date=academic_date)
 
 @router.get("/classroom/{classroom_id}")
 def list_classroom_announcements(
     classroom_id: str,
+    academic_date: str = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> List[Dict[str, Any]]:
-    return announcement_service.get_classroom_announcements(db, current_user, classroom_id)
+    return announcement_service.get_classroom_announcements(db, current_user, classroom_id, academic_date=academic_date)
 
 @router.put("/{announcement_id}")
 def update_announcement(

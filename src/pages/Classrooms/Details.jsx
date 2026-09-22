@@ -103,7 +103,17 @@ export default function ClassroomDetails() {
   const [showAddAnnModal, setShowAddAnnModal] = useState(false);
   const [editingAnnId, setEditingAnnId] = useState(null);
   const [annTitle, setAnnTitle] = useState('');
+  const [annAcademicDate, setAnnAcademicDate] = useState('');
   const [annContent, setAnnContent] = useState('');
+
+  const formatAcademicDate = (dateStr) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+  };
 
   // Copy Invite Code
   const handleCopyCode = () => {
@@ -145,19 +155,21 @@ export default function ClassroomDetails() {
     e.preventDefault();
     if (!annTitle.trim() || !annContent.trim() || !classroom) return;
     if (editingAnnId) {
-      await updateAnnouncement(editingAnnId, annTitle.trim(), annContent.trim());
+      await updateAnnouncement(editingAnnId, annTitle.trim(), annContent.trim(), annAcademicDate || null);
     } else {
-      await addAnnouncement(classroom.id, annTitle.trim(), annContent.trim());
+      await addAnnouncement(classroom.id, annTitle.trim(), annContent.trim(), annAcademicDate || null);
     }
     setShowAddAnnModal(false);
     setEditingAnnId(null);
     setAnnTitle('');
+    setAnnAcademicDate('');
     setAnnContent('');
   };
 
   const handleEditAnnClick = (ann) => {
     setEditingAnnId(ann.id);
     setAnnTitle(ann.title);
+    setAnnAcademicDate(ann.academic_date || ann.academicDate || '');
     setAnnContent(ann.content);
     setShowAddAnnModal(true);
   };
@@ -550,7 +562,16 @@ export default function ClassroomDetails() {
                         </div>
                         <div>
                           <h4 className="text-xs font-extrabold text-slate-800 leading-tight">{ann.title}</h4>
-                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">By {ann.author || ann.author_name || 'Faculty User'} • {ann.date || (ann.created_at ? new Date(ann.created_at).toLocaleDateString() : '')}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                            <span className="text-[10px] text-slate-400 font-semibold">
+                              By {ann.author || ann.author_name || 'Faculty User'} • Posted: {ann.date || (ann.created_at ? new Date(ann.created_at).toLocaleDateString() : '')}
+                            </span>
+                            {(ann.academic_date || ann.academicDate) && (
+                              <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200/60 flex items-center gap-1">
+                                Academic Date: {formatAcademicDate(ann.academic_date || ann.academicDate)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       {userRole === 'faculty' && (
@@ -793,6 +814,16 @@ export default function ClassroomDetails() {
               </div>
 
               <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Academic Event Date (Optional) :</label>
+                <input
+                  type="date"
+                  value={annAcademicDate}
+                  onChange={(e) => setAnnAcademicDate(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3.5 text-xs text-slate-800 outline-hidden focus:bg-white focus:border-indigo-500 transition-colors"
+                />
+              </div>
+
+              <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Message Content :</label>
                 <textarea
                   required
@@ -811,6 +842,7 @@ export default function ClassroomDetails() {
                     setShowAddAnnModal(false);
                     setEditingAnnId(null);
                     setAnnTitle('');
+                    setAnnAcademicDate('');
                     setAnnContent('');
                   }}
                   className="cursor-pointer rounded-xl px-4 py-2.5 text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors"

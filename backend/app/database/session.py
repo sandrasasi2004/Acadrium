@@ -98,6 +98,9 @@ def sync_database_columns(bind_engine):
                 if "author_name" not in columns:
                     conn.execute(text("ALTER TABLE announcements ADD COLUMN author_name VARCHAR(255)"))
                     conn.commit()
+                if "academic_date" not in columns:
+                    conn.execute(text("ALTER TABLE announcements ADD COLUMN academic_date DATE"))
+                    conn.commit()
             # Automatic Backfill for NULL metadata on existing rows
             try:
                 if "resources" in tables and "users" in tables and "classrooms" in tables:
