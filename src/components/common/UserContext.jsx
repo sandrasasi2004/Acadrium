@@ -18,12 +18,16 @@ export function UserProvider({ children }) {
   const [announcements, setAnnouncements] = useState([]);
   const [aiChats, setAiChats] = useState([]);
   
+  // Persistent AI Conversations State
+  const [chats, setChats] = useState([]);
+  const [activeChatId, setActiveChatId] = useState(null);
+  
   // Private Workspace State (PostgreSQL Backed)
   const [workspaceFiles, setWorkspaceFiles] = useState([]);
   const [workspaceNotes, setWorkspaceNotes] = useState([]);
 
   // Data Loading & Error States
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !!localStorage.getItem('token'));
   const [error, setError] = useState(null);
 
   // Global Toast state
@@ -164,6 +168,11 @@ export function UserProvider({ children }) {
             api.listAnnouncements().then(res => {
               if (isMounted && res.success && Array.isArray(res.data)) {
                 setAnnouncements(res.data);
+              }
+            }),
+            api.listChats().then(res => {
+              if (isMounted && res.success && Array.isArray(res.data)) {
+                setChats(res.data);
               }
             })
           ]);
@@ -307,14 +316,6 @@ export function UserProvider({ children }) {
     const errorMsg = res.error || 'Failed to update profile.';
     showToast(errorMsg, 'error');
     return { success: false, error: errorMsg };
-  }, [showToast]);
-
-  const updateProfileAvatar = useCallback((avatarUrl) => {
-    setCurrentUser(prev => prev ? ({
-      ...prev,
-      avatar: avatarUrl
-    }) : null);
-    showToast('Profile picture updated!', 'success');
   }, [showToast]);
 
   const createClassroom = useCallback(async (subject, semester, description, subjectCode = '', department = 'Computer Applications') => {
@@ -614,15 +615,114 @@ export function UserProvider({ children }) {
     return { success: false, error: errorMsg };
   }, [showToast]);
 
+  // AI Persistent Conversation Chat Actions
+  const loadUserChats = useCallback(async () => {
+    const res = await api.listChats();
+    if (res.success && Array.isArray(res.data)) {
+      setChats(res.data);
+      return res.data;
+    }
+    setChats([]);
+    return [];
+  }, []);
+
+  const createNewChat = useCallback(async (title = null) => {
+    const res = await api.createChat(title);
+    if (res.success && res.data) {
+      const newChat = res.data;
+      setChats(prev => [newChat, ...prev]);
+      setActiveChatId(newChat.id);
+      setAiChats([]);
+      return newChat;
+    }
+    return null;
+  }, []);
+
+  const openChat = useCallback(async (chatId) => {
+    if (!chatId) return;
+    const res = await api.getChatDetails(chatId);
+    if (res.success && res.data) {
+      setActiveChatId(chatId);
+      const msgs = res.data.messages || [];
+      setAiChats(msgs.map(m => ({
+        id: m.id,
+        sender: m.sender,
+        text: m.text,
+        content: m.text,
+        sources: Array.isArray(m.sources) ? m.sources : (typeof m.sources_json === 'string' ? JSON.parse(m.sources_json) : []),
+        time: m.time || new Date(m.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      })));
+      return res.data;
+    }
+    return null;
+  }, []);
+
+  const renameChat = useCallback(async (chatId, newTitle) => {
+    const res = await api.renameChat(chatId, newTitle);
+    if (res.success && res.data) {
+      setChats(prev => prev.map(c => c.id === chatId ? { ...c, title: res.data.title } : c));
+      showToast('Conversation renamed', 'success');
+      return { success: true, data: res.data };
+    }
+    showToast(res.error || 'Failed to rename chat', 'error');
+    return { success: false };
+  }, [showToast]);
+
+  const deleteChat = useCallback(async (chatId) => {
+    const res = await api.deleteChat(chatId);
+    if (res.success) {
+      setChats(prev => prev.filter(c => c.id !== chatId));
+      if (activeChatId === chatId) {
+        setActiveChatId(null);
+        setAiChats([]);
+      }
+      showToast('Conversation deleted', 'success');
+      return { success: true };
+    }
+    showToast(res.error || 'Failed to delete chat', 'error');
+    return { success: false };
+  }, [activeChatId, showToast]);
+
   const sendAiMessage = useCallback(async (text) => {
-    const userMsg = {
+    let currentChatId = activeChatId;
+
+    if (!currentChatId) {
+      const newChatRes = await api.createChat();
+      if (newChatRes.success && newChatRes.data) {
+        currentChatId = newChatRes.data.id;
+        setActiveChatId(currentChatId);
+        setChats(prev => [newChatRes.data, ...prev]);
+      }
+    }
+
+    const tempUserMsg = {
       sender: 'user',
       text,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     
-    setAiChats(prev => [...prev, userMsg]);
+    setAiChats(prev => [...prev, tempUserMsg]);
 
+    if (currentChatId) {
+      const res = await api.sendChatMessage(currentChatId, text);
+      if (res.success && res.data) {
+        const botMsg = {
+          id: res.data.bot_message?.id,
+          sender: 'bot',
+          text: res.data.bot_message?.text || 'No response generated.',
+          sources: res.data.sources || [],
+          time: res.data.bot_message?.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        
+        setAiChats(prev => prev.map((m, idx) => idx === prev.length - 1 ? (res.data.user_message || m) : m).concat(botMsg));
+        
+        // Refresh chats list to get auto-updated titles
+        loadUserChats();
+        return botMsg;
+      }
+    }
+
+    // Fallback if chat creation/backend fails
     const res = await api.askAiAssistant(text);
     if (res && res.success && res.data) {
       const botMsg = {
@@ -633,26 +733,16 @@ export function UserProvider({ children }) {
       };
       setAiChats(prev => [...prev, botMsg]);
       return botMsg;
-    } else if (res && res.answer) {
-      const botMsg = {
-        sender: 'bot',
-        text: res.answer,
-        sources: res.sources || [],
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setAiChats(prev => [...prev, botMsg]);
-      return botMsg;
-    } else {
-      const errorMsg = {
-        sender: 'bot',
-        text: res?.error || 'Unable to connect to AI Assistant service.',
-        sources: [],
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setAiChats(prev => [...prev, errorMsg]);
-      return errorMsg;
     }
-  }, []);
+    const errorMsg = {
+      sender: 'bot',
+      text: res?.error || 'Unable to connect to AI Assistant service.',
+      sources: [],
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setAiChats(prev => [...prev, errorMsg]);
+    return errorMsg;
+  }, [activeChatId, loadUserChats]);
 
   const contextValue = useMemo(() => ({
     token,
@@ -665,6 +755,13 @@ export function UserProvider({ children }) {
     workspaceNotes,
     announcements,
     aiChats,
+    chats,
+    activeChatId,
+    loadUserChats,
+    createNewChat,
+    openChat,
+    renameChat,
+    deleteChat,
     isLoading,
     error,
     toast,
@@ -674,7 +771,6 @@ export function UserProvider({ children }) {
     register,
     logout,
     updateProfile,
-    updateProfileAvatar,
     createClassroom,
     joinClassroom,
     leaveClassroom,
@@ -708,6 +804,8 @@ export function UserProvider({ children }) {
     workspaceNotes,
     announcements,
     aiChats,
+    chats,
+    activeChatId,
     isLoading,
     error,
     toast,
@@ -717,7 +815,6 @@ export function UserProvider({ children }) {
     register,
     logout,
     updateProfile,
-    updateProfileAvatar,
     createClassroom,
     joinClassroom,
     leaveClassroom,
@@ -740,7 +837,12 @@ export function UserProvider({ children }) {
     addAnnouncement,
     updateAnnouncement,
     deleteAnnouncement,
-    sendAiMessage
+    sendAiMessage,
+    loadUserChats,
+    createNewChat,
+    openChat,
+    renameChat,
+    deleteChat
   ]);
 
   return (

@@ -63,21 +63,17 @@ export default function Header() {
       {/* Right side user profile badge */}
       <div className="flex items-center gap-3">
         <Link to="/profile" className="flex items-center gap-3 hover:opacity-85 transition-opacity">
-          <img
-            src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
-            alt={currentUser?.name || 'User Profile'}
-            className="h-9 w-9 rounded-full object-cover border border-indigo-200 ring-2 ring-indigo-50"
-          />
-          <div className="hidden text-left md:block">
-            <p className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[120px]">
-              {currentUser?.name || 'Acadrium User'}
+          <div className="text-left">
+            <p className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[150px]">
+              {currentUser?.name || currentUser?.full_name || 'Acadrium User'}
             </p>
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+            <p className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wider">
               {userRole || 'Student'}
             </p>
           </div>
         </Link>
       </div>
+
     </header>
   );
 }

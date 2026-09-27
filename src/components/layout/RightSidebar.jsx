@@ -38,9 +38,9 @@ export default function RightSidebar() {
           </div>
           <div>
             <h2 className="text-sm font-bold text-slate-800">Acadrium <span className="text-indigo-600 font-semibold">AI Assistant</span></h2>
-            <p className="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-              Backend integration ready
+            <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              PostgreSQL RAG Connected
             </p>
           </div>
         </div>
@@ -59,9 +59,9 @@ export default function RightSidebar() {
             <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
               <MessageSquareCode className="h-8 w-8" />
             </div>
-            <h4 className="text-xs font-bold text-slate-800 mb-2">AI features will become available after backend integration.</h4>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Click anywhere on this panel to open the Acadrium AI workspace.
+            <h4 className="text-xs font-bold text-slate-800 mb-2">Acadrium AI Academic Companion</h4>
+            <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+              Ask questions about lecture files, announcements, or study notes. Click to open full workspace.
             </p>
           </div>
         )}
@@ -110,15 +110,8 @@ export default function RightSidebar() {
             e.preventDefault();
             handleSendMessage(inputValue);
           }}
-          className="relative flex items-center bg-slate-100 rounded-full border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100 transition-all"
+          className="relative flex items-center bg-slate-100 rounded-full border border-slate-200 px-3 focus-within:border-indigo-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100 transition-all"
         >
-          <button 
-            type="button"
-            className="cursor-pointer flex h-10 w-10 items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            <Plus className="h-5 w-5" />
-          </button>
-          
           <input
             type="text"
             placeholder="Ask Acadrium AI..."
@@ -131,7 +124,7 @@ export default function RightSidebar() {
           <button
             type="submit"
             disabled={!inputValue.trim() || isTyping}
-            className={`cursor-pointer mr-1.5 flex h-8 w-8 items-center justify-center rounded-full text-white transition-all shadow-xs ${
+            className={`cursor-pointer flex h-8 w-8 items-center justify-center rounded-full text-white transition-all shadow-xs shrink-0 ${
               inputValue.trim() && !isTyping
                 ? 'bg-indigo-600 hover:bg-indigo-700'
                 : 'bg-slate-300 cursor-not-allowed'

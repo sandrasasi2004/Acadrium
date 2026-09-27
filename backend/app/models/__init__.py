@@ -5,6 +5,7 @@ from app.models.workspace_resource import WorkspaceResource
 from app.models.announcement import Announcement
 from app.models.workspace_note import WorkspaceNote
 from app.models.timeline_event import TimelineEvent
+from app.models.chat import AIChat, AIMessage
 
 __all__ = [
     "User",
@@ -15,5 +16,7 @@ __all__ = [
     "Announcement",
     "WorkspaceNote",
     "TimelineEvent",
+    "AIChat",
+    "AIMessage",
 ]
 

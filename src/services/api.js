@@ -575,16 +575,63 @@ export async function askAiAssistant(question) {
   return res;
 }
 
-export async function getResourceSummary(resourceId) {
-  const res = await fetchApi(`/ai/resources/${resourceId}/summary`, {
+export async function getResourceSummary(resourceId, force = false) {
+  const endpoint = `/ai/resources/${resourceId}/summary${force ? '?force=true' : ''}`;
+  const res = await fetchApi(endpoint, {
     method: 'POST',
   });
   return res;
 }
 
-export async function getWorkspaceSummary(fileId) {
-  const res = await fetchApi(`/ai/workspace/${fileId}/summary`, {
+export async function getWorkspaceSummary(fileId, force = false) {
+  const endpoint = `/ai/workspace/${fileId}/summary${force ? '?force=true' : ''}`;
+  const res = await fetchApi(endpoint, {
     method: 'POST',
+  });
+  return res;
+}
+
+// ==========================================
+// CHAT PERSISTENCE & HISTORY APIs
+// ==========================================
+
+export async function listChats() {
+  const res = await fetchApi('/chats', { method: 'GET' });
+  return res;
+}
+
+export async function createChat(title = null) {
+  const res = await fetchApi('/chats', {
+    method: 'POST',
+    body: JSON.stringify({ title }),
+  });
+  return res;
+}
+
+export async function getChatDetails(chatId) {
+  const res = await fetchApi(`/chats/${chatId}`, { method: 'GET' });
+  return res;
+}
+
+export async function sendChatMessage(chatId, message) {
+  const res = await fetchApi(`/chats/${chatId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ message: message.trim() }),
+  });
+  return res;
+}
+
+export async function renameChat(chatId, newTitle) {
+  const res = await fetchApi(`/chats/${chatId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ title: newTitle.trim() }),
+  });
+  return res;
+}
+
+export async function deleteChat(chatId) {
+  const res = await fetchApi(`/chats/${chatId}`, {
+    method: 'DELETE',
   });
   return res;
 }

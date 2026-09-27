@@ -68,7 +68,7 @@ class User(Base):
             "role": self.role,
             "department": self.department or "Not Set",
             "semester": self.semester or "Not Set",
-            "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150" if self.role == "faculty" else "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
+
 

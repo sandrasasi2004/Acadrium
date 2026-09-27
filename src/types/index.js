@@ -10,7 +10,6 @@
  * @property {'student' | 'faculty'} role - User role
  * @property {string} [department] - Department name
  * @property {string} [semester] - Semester string for students
- * @property {string} [avatar] - Avatar image URL
  */
 
 /**

@@ -3,25 +3,10 @@ import { useUser } from '../../components/common/UserContext';
 import { Mail, School, BookOpen, Edit2, Sparkles, Key, Camera, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function Profile() {
-  const { currentUser, userRole, updateProfile, updateProfileAvatar } = useUser();
+  const { currentUser, userRole, updateProfile } = useUser();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  
-  // Edit Form State
-  const [editName, setEditName] = useState(currentUser?.full_name || currentUser?.name || '');
-  const [editEmail, setEditEmail] = useState(currentUser?.email || '');
-  const [editDept, setEditDept] = useState(currentUser?.department && currentUser.department !== 'Not Set' ? currentUser.department : '');
-  const [editSem, setEditSem] = useState(currentUser?.semester && currentUser.semester !== 'Not Set' ? currentUser.semester : '');
-  const [editError, setEditError] = useState('');
-  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
-  const handleAvatarFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      updateProfileAvatar(url);
-    }
-  };
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -117,29 +102,7 @@ export default function Profile() {
         <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none"></div>
 
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 relative z-10">
-          {/* Avatar frame */}
-          <div className="relative group cursor-pointer" title="Edit Profile Picture">
-            <input
-              type="file"
-              id="profile-avatar-input"
-              onChange={handleAvatarFileChange}
-              accept="image/png, image/jpeg, image/jpg, image/webp"
-              className="hidden"
-            />
-            <label htmlFor="profile-avatar-input" className="cursor-pointer block relative">
-              <img 
-                src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
-                alt={userDisplayName} 
-                className="h-28 w-28 rounded-3xl object-cover border border-indigo-150 shadow-md ring-4 ring-indigo-50 group-hover:opacity-75 transition-opacity"
-              />
-              <span className="absolute inset-0 flex items-center justify-center rounded-3xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Camera className="h-6 w-6 text-white" />
-              </span>
-              <span className="absolute -bottom-2.5 -right-2.5 flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-xs">
-                <Sparkles className="h-4 w-4" />
-              </span>
-            </label>
-          </div>
+
 
           {/* Identity details */}
           <div className="flex-1 text-center sm:text-left space-y-3">

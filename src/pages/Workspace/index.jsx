@@ -544,7 +544,7 @@ export default function Workspace() {
                       type="submit"
                       className="cursor-pointer rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors flex items-center gap-1.5 shadow-md"
                     >
-                      <Save className="h-4 w-4" /> Save Note to DB
+                      <Save className="h-4 w-4" /> Save
                     </button>
                   </div>
                 </form>

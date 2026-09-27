@@ -26,6 +26,10 @@ class Settings(BaseSettings):
         "http://localhost:3000"
     ]
 
+    # Groq LLM Configuration (Qwen Model)
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "qwen/qwen3.8-27b"
+
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE) if ENV_FILE.exists() else ".env",
         env_file_encoding="utf-8",

@@ -5,15 +5,20 @@ import {
   Megaphone, 
   ArrowRight, 
   Sparkles, 
-  AlertCircle
+  AlertCircle,
+  BookOpen,
+  Users,
+  FolderGit2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Dashboard() {
   const { 
     userRole, 
+    classrooms,
     resources, 
     announcements,
+    workspaceFiles,
     isLoading,
     error,
     fetchClassrooms
@@ -26,6 +31,9 @@ export default function Dashboard() {
   // Get data limits
   const recentResources = resources.slice(0, 3);
   const recentAnnouncements = announcements.slice(0, 3);
+
+  // Calculate statistics from real database arrays
+  const totalStudents = classrooms.reduce((acc, c) => acc + (c.student_count || c.studentCount || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -53,6 +61,103 @@ export default function Dashboard() {
         </div>
         <div className="absolute right-0 bottom-0 top-0 hidden w-1/3 bg-radial-gradient from-white/10 to-transparent opacity-70 lg:block pointer-events-none"></div>
         <div className="absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-indigo-500/20 blur-xl pointer-events-none"></div>
+      </div>
+
+      {/* KPI STATISTICS CARDS (Feature Group 6) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {userRole === 'faculty' ? (
+          <>
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Classrooms</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                  <BookOpen className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-slate-800">{classrooms.length}</p>
+              <p className="text-[10px] font-semibold text-slate-500">Active Course Sections</p>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Course Materials</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <FileText className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-slate-800">{resources.length}</p>
+              <p className="text-[10px] font-semibold text-slate-500">Uploaded Resources</p>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Announcements</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                  <Megaphone className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-slate-800">{announcements.length}</p>
+              <p className="text-[10px] font-semibold text-slate-500">Published Notices</p>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Enrolled Students</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                  <Users className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-slate-800">{totalStudents}</p>
+              <p className="text-[10px] font-semibold text-slate-500">Active Students</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Enrolled Classes</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                  <BookOpen className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-slate-800">{classrooms.length}</p>
+              <p className="text-[10px] font-semibold text-slate-500">Active Enrolled Courses</p>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Class Resources</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <FileText className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-slate-800">{resources.length}</p>
+              <p className="text-[10px] font-semibold text-slate-500">Available Resources</p>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Announcements</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                  <Megaphone className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-slate-800">{announcements.length}</p>
+              <p className="text-[10px] font-semibold text-slate-500">Class Notices</p>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Workspace Files</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                  <FolderGit2 className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-slate-800">{(workspaceFiles || []).length}</p>
+              <p className="text-[10px] font-semibold text-slate-500">Private Vault Items</p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* FEED SECTIONS */}

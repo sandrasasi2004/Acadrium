@@ -34,7 +34,7 @@ class UserResponse(BaseModel):
     role: str
     department: Optional[str] = None
     semester: Optional[str] = None
-    avatar: Optional[str] = None
+
 
     class Config:
         from_attributes = True

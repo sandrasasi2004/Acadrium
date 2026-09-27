@@ -186,23 +186,24 @@ export default function DocumentViewer({ file, onClose }) {
   const [summary, setSummary] = useState(file?.summary || file?.resource_summary || '');
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
-  const handleGenerateSummary = async () => {
+  const handleGenerateSummary = async (force = false) => {
     setIsGeneratingSummary(true);
+    const forceFlag = force || Boolean(summary);
     try {
       let res;
       if (file.classroom_id || file.uploader_name || file.uploadedBy) {
-        res = await api.getResourceSummary(file.id);
+        res = await api.getResourceSummary(file.id, forceFlag);
       } else {
-        res = await api.getWorkspaceSummary(file.id);
+        res = await api.getWorkspaceSummary(file.id, forceFlag);
       }
       if (res && res.success && res.data?.summary) {
         setSummary(res.data.summary);
         setViewMode('summary');
-        showToast('Academic summary generated!', 'success');
+        showToast(forceFlag ? 'Summary regenerated!' : 'Academic summary generated!', 'success');
       } else if (res && res.summary) {
         setSummary(res.summary);
         setViewMode('summary');
-        showToast('Academic summary generated!', 'success');
+        showToast(forceFlag ? 'Summary regenerated!' : 'Academic summary generated!', 'success');
       } else {
         showToast('Unable to generate summary.', 'error');
       }
@@ -452,12 +453,12 @@ export default function DocumentViewer({ file, onClose }) {
           </div>
 
           <button
-            onClick={handleGenerateSummary}
+            onClick={() => handleGenerateSummary(Boolean(summary))}
             disabled={isGeneratingSummary}
             className="cursor-pointer bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs border border-indigo-400/30"
           >
             <Sparkles className={`h-3.5 w-3.5 ${isGeneratingSummary ? 'animate-spin' : ''}`} />
-            <span>{isGeneratingSummary ? 'Summarizing...' : 'Generate Summary'}</span>
+            <span>{isGeneratingSummary ? 'Summarizing...' : (summary ? 'Regenerate Summary' : 'Generate Summary')}</span>
           </button>
 
           {viewMode === 'preview' && (isImage || isPdf) && (

@@ -63,17 +63,13 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         </div>
 
         {/* User Card */}
-        <div className="flex items-center gap-3 border-b border-slate-100 px-6 py-4">
-          <img 
-            src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
-            alt={currentUser?.name || 'Acadrium User'} 
-            className="h-10 w-10 rounded-full border border-indigo-100 object-cover"
-          />
+        <div className="border-b border-slate-100 px-6 py-4">
           <div className="overflow-hidden">
-            <h3 className="truncate text-sm font-bold text-slate-800 uppercase tracking-tight">{currentUser?.name || (userRole === 'faculty' ? 'Faculty User' : 'Student User')}</h3>
-            <p className="text-xs font-medium text-indigo-650 capitalize">{userRole} Account</p>
+            <h3 className="truncate text-sm font-bold text-slate-800 uppercase tracking-tight">{currentUser?.name || currentUser?.full_name || (userRole === 'faculty' ? 'Faculty User' : 'Student User')}</h3>
+            <p className="text-xs font-medium text-indigo-600 capitalize">{userRole} Account</p>
           </div>
         </div>
+
 
         {/* Navigation Links */}
         <nav className="flex-1 space-y-1 px-4 py-6 overflow-y-auto">
