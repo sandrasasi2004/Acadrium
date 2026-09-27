@@ -29,6 +29,30 @@ export default function Resources() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClass, setSelectedClass] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
+  const [semanticResults, setSemanticResults] = useState(null);
+  const [isSearchingSemantic, setIsSearchingSemantic] = useState(false);
+
+  // Debounced vector semantic search API call
+  useEffect(() => {
+    if (!searchQuery || !searchQuery.trim()) {
+      setSemanticResults(null);
+      setIsSearchingSemantic(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingSemantic(true);
+      const res = await api.searchResourcesSemantic(searchQuery.trim());
+      if (res && res.success && Array.isArray(res.data)) {
+        setSemanticResults(res.data);
+      } else {
+        setSemanticResults(null);
+      }
+      setIsSearchingSemantic(false);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Modal State
   const [showAddResModal, setShowAddResModal] = useState(false);
@@ -75,7 +99,6 @@ export default function Resources() {
     return (bytes / 1024).toFixed(0) + ' KB';
   };
 
-  // Handle resource submit via real backend API
   const handleAddResSubmit = async (e) => {
     e.preventDefault();
     if (!resTitle.trim() || !selectedFile || !resClassroomId) {
@@ -113,13 +136,17 @@ export default function Resources() {
     }
   };
 
-  // Filter resources based on title, original filename, tags, classroom, and file type
-  const filteredResources = resources.filter(res => {
+  // Filter resources (either from vector semantic search API or fallback list filter)
+  const baseList = semanticResults !== null ? semanticResults : resources;
+
+  const filteredResources = baseList.filter(res => {
     const query = searchQuery.toLowerCase();
-    const matchesSearch = (res.title || '').toLowerCase().includes(query) || 
-                          (res.original_filename || '').toLowerCase().includes(query) ||
-                          (res.tags || '').toLowerCase().includes(query) ||
-                          (res.classroom_name || res.classroomName || '').toLowerCase().includes(query);
+    const matchesSearch = semanticResults !== null ? true : (
+      (res.title || '').toLowerCase().includes(query) || 
+      (res.original_filename || '').toLowerCase().includes(query) ||
+      (res.tags || '').toLowerCase().includes(query) ||
+      (res.classroom_name || res.classroomName || '').toLowerCase().includes(query)
+    );
     const matchesClass = selectedClass === 'all' || strEquals(res.classroom_id || res.classroomId, selectedClass);
     const matchesType = selectedType === 'all' || (res.file_type || res.type) === selectedType;
     return matchesSearch && matchesClass && matchesType;
@@ -144,7 +171,7 @@ export default function Resources() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">Resources</h1>
-          <p className="text-xs text-slate-500 mt-1">Shared classroom materials uploaded by faculty.</p>
+          <p className="text-xs text-slate-500 mt-1">Shared classroom materials uploaded by faculty. Powered by PGVector Semantic Search.</p>
         </div>
 
         {userRole === 'faculty' && (
@@ -159,18 +186,23 @@ export default function Resources() {
 
       {/* Filter Options Bar */}
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
-        {/* Search */}
-        <div className="relative w-full md:max-w-xs">
-          <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
-            <Search className="h-4 w-4" />
+        {/* Semantic Search Bar */}
+        <div className="relative w-full md:max-w-md">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-indigo-500">
+            {isSearchingSemantic ? <Sparkles className="h-4 w-4 animate-spin text-indigo-600" /> : <Search className="h-4 w-4 text-indigo-500" />}
           </span>
           <input
             type="text"
-            placeholder="Search by title, subject, tags..."
+            placeholder="Vector Semantic Search (e.g. DBMS normalization, java concepts)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-4 text-xs text-slate-800 outline-hidden transition-all focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-xl border border-indigo-200 bg-indigo-50/20 py-2.5 pl-9 pr-4 text-xs font-semibold text-slate-800 outline-hidden transition-all focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500"
           />
+          {semanticResults !== null && (
+            <span className="absolute right-3 top-2.5 text-[9px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">
+              PGVector Active
+            </span>
+          )}
         </div>
 
         {/* Categories Dropdowns */}
@@ -197,14 +229,14 @@ export default function Resources() {
             <option value="all">All File Types</option>
             <option value="PDF">PDF Documents</option>
             <option value="PPT">PowerPoint Slides</option>
-            <option value="DOC">Word Documents</option>
+            <option value="DOCX">Word Documents</option>
             <option value="IMAGE">Images</option>
           </select>
         </div>
       </div>
 
       {/* Loading Skeleton */}
-      {isLoading ? (
+      {isLoading || isSearchingSemantic ? (
         <div className="rounded-3xl border border-slate-200 bg-white p-6 space-y-3 shadow-xs">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="animate-pulse h-12 bg-slate-100 rounded-2xl"></div>
@@ -214,10 +246,10 @@ export default function Resources() {
         /* Empty State */
         <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-xs">
           <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-          <h4 className="text-sm font-bold text-slate-700">No resources available</h4>
+          <h4 className="text-sm font-bold text-slate-700">No matching resources found</h4>
           <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
             {searchQuery || selectedClass !== 'all' || selectedType !== 'all' 
-              ? 'No resources match your active search filters.' 
+              ? 'No resources matched your semantic vector query or filters.' 
               : 'Shared classroom materials will appear here once uploaded by faculty.'}
           </p>
         </div>
@@ -237,15 +269,18 @@ export default function Resources() {
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {filteredResources.map((res) => {
-                  const typeTag = res.file_type || res.type || 'PDF';
+                  const typeTag = (res.file_type || res.type || 'PDF').toUpperCase();
                   const uploader = res.uploader_name || res.uploadedBy || 'Faculty';
                   const classroomName = res.classroom_name || res.classroomName || 'Classroom';
                   const createdDate = res.created_at ? new Date(res.created_at).toLocaleDateString() : (res.uploadedDate || 'N/A');
                   const formattedSize = getFileSizeString(res.file_size || res.size);
 
-                  const statusVal = (res.extraction_status || 'COMPLETED').toUpperCase();
+                  const statusVal = (res.processing_status || res.extraction_status || 'COMPLETED').toUpperCase();
                   const isProcessing = statusVal === 'PENDING' || statusVal === 'PROCESSING';
                   const isFailed = statusVal === 'FAILED';
+                  const pageCount = res.page_count || 0;
+                  const wordCount = res.word_count || 0;
+                  const similarityScore = res.similarity ? Math.round(res.similarity * 100) : null;
 
                   return (
                     <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
@@ -260,13 +295,23 @@ export default function Resources() {
                             {typeTag}
                           </div>
                           <div>
-                            <button
-                              onClick={() => handleDownload(res)}
-                              className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
-                            >
-                              {res.title}
-                            </button>
-                            <span className="text-[10px] text-slate-400 font-semibold">{formattedSize} • By {uploader}</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleDownload(res)}
+                                className="text-left text-slate-800 font-bold block hover:text-indigo-600 hover:underline cursor-pointer"
+                              >
+                                {res.title}
+                              </button>
+                              {similarityScore !== null && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-extrabold text-indigo-700 border border-indigo-200">
+                                  <Sparkles className="h-2.5 w-2.5 text-indigo-600" />
+                                  {similarityScore}% Match
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-semibold">
+                              {formattedSize} • By {uploader} {pageCount > 0 ? `• ${pageCount} pgs` : ''} {wordCount > 0 ? `• ${wordCount} words` : ''}
+                            </span>
                           </div>
                         </div>
                       </td>
@@ -276,22 +321,24 @@ export default function Resources() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        {isProcessing ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 border border-amber-200">
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                            Processing...
-                          </span>
-                        ) : isFailed ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-rose-700 border border-rose-200">
-                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                            Failed
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                            Processed
-                          </span>
-                        )}
+                        <div className="flex flex-col gap-1 items-start">
+                          {isProcessing ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 border border-amber-200">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                              Processing...
+                            </span>
+                          ) : isFailed ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-rose-700 border border-rose-200">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                              Failed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              Processed
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-slate-500 font-medium">{createdDate}</td>
                       <td className="px-6 py-4 text-right space-x-2">

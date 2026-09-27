@@ -29,7 +29,25 @@ def sync_database_columns(bind_engine):
         from sqlalchemy import inspect, text
         inspector = inspect(bind_engine)
         tables = inspector.get_table_names()
+        has_pgvector = False
         with bind_engine.connect() as conn:
+            if bind_engine.dialect.name == "postgresql":
+                try:
+                    conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+                    conn.commit()
+                    has_pgvector = True
+                    print("[Database] PostgreSQL pgvector extension enabled.")
+                except Exception as pg_verr:
+                    conn.rollback()
+                    print(f"[Database Warning] pgvector extension not available on PostgreSQL host: {pg_verr}")
+                    # Check if vector extension was pre-installed
+                    try:
+                        ext_check = conn.execute(text("SELECT extname FROM pg_extension WHERE extname = 'vector';")).fetchone()
+                        if ext_check:
+                            has_pgvector = True
+                    except Exception:
+                        conn.rollback()
+
             if "resources" in tables:
                 columns = [c["name"] for c in inspector.get_columns("resources")]
                 if "extracted_text" not in columns:
@@ -37,6 +55,9 @@ def sync_database_columns(bind_engine):
                     conn.commit()
                 if "extraction_status" not in columns:
                     conn.execute(text("ALTER TABLE resources ADD COLUMN extraction_status VARCHAR(20) DEFAULT 'PENDING'"))
+                    conn.commit()
+                if "ocr_status" not in columns:
+                    conn.execute(text("ALTER TABLE resources ADD COLUMN ocr_status VARCHAR(50) DEFAULT 'NOT_APPLICABLE'"))
                     conn.commit()
                 if "extraction_error" not in columns:
                     conn.execute(text("ALTER TABLE resources ADD COLUMN extraction_error TEXT"))
@@ -56,6 +77,15 @@ def sync_database_columns(bind_engine):
                 if "last_processed_at" not in columns:
                     conn.execute(text("ALTER TABLE resources ADD COLUMN last_processed_at TIMESTAMP"))
                     conn.commit()
+                if "embedding" not in columns:
+                    if bind_engine.dialect.name == "postgresql" and has_pgvector:
+                        conn.execute(text("ALTER TABLE resources ADD COLUMN embedding vector(384)"))
+                    else:
+                        conn.execute(text("ALTER TABLE resources ADD COLUMN embedding TEXT"))
+                    conn.commit()
+                if "resource_summary" not in columns:
+                    conn.execute(text("ALTER TABLE resources ADD COLUMN resource_summary TEXT"))
+                    conn.commit()
 
             if "workspace_resources" in tables:
                 columns = [c["name"] for c in inspector.get_columns("workspace_resources")]
@@ -64,6 +94,9 @@ def sync_database_columns(bind_engine):
                     conn.commit()
                 if "extraction_status" not in columns:
                     conn.execute(text("ALTER TABLE workspace_resources ADD COLUMN extraction_status VARCHAR(20) DEFAULT 'PENDING'"))
+                    conn.commit()
+                if "ocr_status" not in columns:
+                    conn.execute(text("ALTER TABLE workspace_resources ADD COLUMN ocr_status VARCHAR(50) DEFAULT 'NOT_APPLICABLE'"))
                     conn.commit()
                 if "extraction_error" not in columns:
                     conn.execute(text("ALTER TABLE workspace_resources ADD COLUMN extraction_error TEXT"))
@@ -79,6 +112,15 @@ def sync_database_columns(bind_engine):
                     conn.commit()
                 if "last_processed_at" not in columns:
                     conn.execute(text("ALTER TABLE workspace_resources ADD COLUMN last_processed_at TIMESTAMP"))
+                    conn.commit()
+                if "embedding" not in columns:
+                    if bind_engine.dialect.name == "postgresql" and has_pgvector:
+                        conn.execute(text("ALTER TABLE workspace_resources ADD COLUMN embedding vector(384)"))
+                    else:
+                        conn.execute(text("ALTER TABLE workspace_resources ADD COLUMN embedding TEXT"))
+                    conn.commit()
+                if "resource_summary" not in columns:
+                    conn.execute(text("ALTER TABLE workspace_resources ADD COLUMN resource_summary TEXT"))
                     conn.commit()
 
             if "workspace_notes" in tables:
@@ -122,6 +164,7 @@ def sync_database_columns(bind_engine):
                     conn.execute(text("UPDATE announcements SET announcement_type = 'GENERAL' WHERE (announcement_type IS NULL OR announcement_type = '')"))
                     conn.commit()
             except Exception as backfill_err:
+                conn.rollback()
                 print(f"[Database Backfill Info] {backfill_err}")
     except Exception as e:
         print(f"[Database Schema Warning] Migration check skipped: {e}")

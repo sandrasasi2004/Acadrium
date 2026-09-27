@@ -320,6 +320,20 @@ export async function deleteResource(resourceId) {
   return res;
 }
 
+export async function reprocessResource(resourceId) {
+  const res = await fetchApi(`/resources/${resourceId}/reprocess`, {
+    method: 'POST',
+  });
+  return res;
+}
+
+export async function reprocessWorkspaceFile(fileId) {
+  const res = await fetchApi(`/workspace/${fileId}/reprocess`, {
+    method: 'POST',
+  });
+  return res;
+}
+
 // ==========================================
 // WORKSPACE APIs (Phase 6 Real Backend Integration)
 // ==========================================
@@ -530,16 +544,47 @@ export async function deleteAnnouncement(announcementId) {
 }
 
 // ==========================================
-// AI ASSISTANT API
+// SEMANTIC SEARCH APIs (PGVector Powered)
 // ==========================================
 
-export async function sendAiMessage(_messageText) {
-  return Promise.resolve({
-    success: true,
-    data: {
-      sender: 'bot',
-      text: 'AI features will become available after backend integration.',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
+export async function searchResourcesSemantic(query) {
+  const res = await fetchApi('/search/resources', {
+    method: 'POST',
+    body: JSON.stringify({ query: query.trim() }),
   });
+  return res;
+}
+
+export async function searchWorkspaceSemantic(query) {
+  const res = await fetchApi('/search/workspace', {
+    method: 'POST',
+    body: JSON.stringify({ query: query.trim() }),
+  });
+  return res;
+}
+
+// ==========================================
+// AI ASSISTANT & RAG APIs
+// ==========================================
+
+export async function askAiAssistant(question) {
+  const res = await fetchApi('/ai/ask', {
+    method: 'POST',
+    body: JSON.stringify({ question: question.trim() }),
+  });
+  return res;
+}
+
+export async function getResourceSummary(resourceId) {
+  const res = await fetchApi(`/ai/resources/${resourceId}/summary`, {
+    method: 'POST',
+  });
+  return res;
+}
+
+export async function getWorkspaceSummary(fileId) {
+  const res = await fetchApi(`/ai/workspace/${fileId}/summary`, {
+    method: 'POST',
+  });
+  return res;
 }

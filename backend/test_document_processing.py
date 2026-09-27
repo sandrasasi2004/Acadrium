@@ -207,7 +207,24 @@ def test_document_processing_suite():
         finally:
             db.close()
 
-        # --- TEST 7: Image / Missing OCR Graceful Handling ---
+        # Verify metadata expansion
+        assert res_details["preview_available"] is True
+        assert res_details["extracted_text_available"] is True
+        assert res_details["processing_status"] == "COMPLETED"
+        assert res_details["ocr_status"] == "NOT_APPLICABLE"
+
+        # --- TEST 7: Reprocessing API Endpoints ---
+        reproc_resp = client.post(f"/api/resources/{pdf_id}/reprocess", headers=headers)
+        assert reproc_resp.status_code == 200
+        assert reproc_resp.json()["extraction_status"] == "COMPLETED"
+        print(f"[PASS 10] POST /api/resources/{pdf_id}/reprocess returned COMPLETED")
+
+        ws_reproc_resp = client.post(f"/api/workspace/{ws_id}/reprocess", headers=headers)
+        assert ws_reproc_resp.status_code == 200
+        assert ws_reproc_resp.json()["extraction_status"] == "COMPLETED"
+        print(f"[PASS 11] POST /api/workspace/{ws_id}/reprocess returned COMPLETED")
+
+        # --- TEST 8: Image / Missing OCR Graceful Handling ---
         img_upload = client.post("/api/resources/upload", data={
             "classroom_id": classroom_id,
             "title": "Diagram Image",
@@ -219,11 +236,12 @@ def test_document_processing_suite():
         process_uploaded_resource(img_id)
         img_details = client.get(f"/api/resources/{img_id}", headers=headers).json()
         assert img_details["extraction_status"] in ("COMPLETED", "FAILED")
+        assert "ocr_status" in img_details
         if img_details["extraction_status"] == "FAILED":
             assert img_details["extraction_error"] is not None
-            print(f"[PASS 10] OCR Graceful Failure handling verified. Error logged: '{img_details['extraction_error']}'")
+            print(f"[PASS 12] OCR Graceful Failure handling verified. OCR Status: '{img_details['ocr_status']}' | Error: '{img_details['extraction_error']}'")
         else:
-            print("[PASS 10] Image OCR completed successfully")
+            print("[PASS 12] Image OCR completed successfully")
 
     finally:
         # Cleanup temporary test files

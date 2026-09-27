@@ -10,6 +10,8 @@ from app.routes.workspace import router as workspace_router
 from app.routes.workspace_notes import router as workspace_notes_router
 from app.routes.announcements import router as announcements_router
 from app.routes.timeline import router as timeline_router
+from app.routes.search import router as search_router
+from app.routes.ai import router as ai_router
 from app.models import timeline_event  # Ensure model registered for Base.metadata.create_all
 from app.services.resource_service import ensure_storage_directories
 from app.services.workspace_service import ensure_workspace_directories
@@ -51,7 +53,9 @@ app.include_router(workspace_notes_router, prefix=settings.API_V1_STR)
 app.include_router(workspace_router, prefix=settings.API_V1_STR)
 app.include_router(announcements_router, prefix=settings.API_V1_STR)
 app.include_router(timeline_router, prefix=settings.API_V1_STR)
-logger.info(f"[FastAPI Startup] Auth, Classrooms, Resources, Workspace, Workspace Notes, Announcements & Timeline routers registered under prefix: {settings.API_V1_STR}")
+app.include_router(search_router, prefix=settings.API_V1_STR)
+app.include_router(ai_router, prefix=settings.API_V1_STR)
+logger.info(f"[FastAPI Startup] Auth, Classrooms, Resources, Workspace, Notes, Announcements, Timeline, Search & AI routers registered under prefix: {settings.API_V1_STR}")
 
 @app.get("/")
 def root():

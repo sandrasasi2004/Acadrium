@@ -1,8 +1,9 @@
 import os
 import time
 import logging
+import shutil
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from app.models.user import User
@@ -17,68 +18,106 @@ def is_tesseract_available() -> bool:
     """Check if Tesseract OCR binary is installed and reachable."""
     try:
         import pytesseract
-        import shutil
-        if shutil.which("tesseract") is not None:
+
+        # 1. Check custom environment variable overrides
+        env_cmd = os.environ.get("TESSERACT_CMD") or os.environ.get("TESSERACT_PATH")
+        if env_cmd and os.path.exists(env_cmd):
+            pytesseract.pytesseract.tesseract_cmd = env_cmd
             return True
-        # Check standard Windows paths if not in PATH
+
+        # 2. Check if tesseract binary is in System PATH
+        which_path = shutil.which("tesseract") or shutil.which("tesseract.exe")
+        if which_path:
+            pytesseract.pytesseract.tesseract_cmd = which_path
+            return True
+
+        # 3. Check standard Windows installation paths
         win_paths = [
             r"C:\Program Files\Tesseract-OCR\tesseract.exe",
             r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-            os.path.expanduser(r"~\AppData\Local\Programs\Tesseract-OCR\tesseract.exe")
+            os.path.expanduser(r"~\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"),
+            r"C:\ProgramData\chocolatey\bin\tesseract.exe",
+            r"C:\ProgramData\chocolatey\lib\tesseract\tools\tesseract.exe",
         ]
         for path in win_paths:
             if os.path.exists(path):
                 pytesseract.pytesseract.tesseract_cmd = path
                 return True
+
         return False
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Error checking Tesseract OCR availability: {e}")
         return False
 
 def extract_text_from_pdf(file_path: str) -> str:
     """Extract text from all pages of a PDF using PyMuPDF (pymupdf/fitz)."""
     import pymupdf  # fitz
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Physical file not found at path: {file_path}")
+
     doc = pymupdf.open(file_path)
     text_chunks = []
     for page_num in range(len(doc)):
         page = doc[page_num]
-        text_chunks.append(page.get_text())
+        page_text = page.get_text()
+        if page_text and page_text.strip():
+            text_chunks.append(page_text.strip())
     doc.close()
-    return "\n".join(text_chunks).strip()
+    
+    extracted = "\n\n".join(text_chunks).strip()
+    return extracted
 
 def extract_text_from_docx(file_path: str) -> str:
-    """Extract text from paragraphs, headings, and lists of a Word document using python-docx."""
+    """Extract text from paragraphs, headings, and tables of a Word document using python-docx."""
     import docx
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Physical file not found at path: {file_path}")
+
     doc = docx.Document(file_path)
     text_chunks = []
+    
     for paragraph in doc.paragraphs:
         if paragraph.text and paragraph.text.strip():
             text_chunks.append(paragraph.text.strip())
+
     for table in doc.tables:
         for row in table.rows:
             row_text = [cell.text.strip() for cell in row.cells if cell.text.strip()]
             if row_text:
                 text_chunks.append(" | ".join(row_text))
+
     return "\n".join(text_chunks).strip()
 
 def extract_text_from_pptx(file_path: str) -> str:
     """Extract text from slide titles, text boxes, and bullets of a PowerPoint presentation using python-pptx."""
     import pptx
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Physical file not found at path: {file_path}")
+
     prs = pptx.Presentation(file_path)
     text_chunks = []
+    
     for slide_idx, slide in enumerate(prs.slides, 1):
         slide_title = ""
         if slide.shapes.title and slide.shapes.title.text:
             slide_title = slide.shapes.title.text.strip()
             text_chunks.append(f"Slide {slide_idx}: {slide_title}")
+        else:
+            text_chunks.append(f"Slide {slide_idx}")
+
         for shape in slide.shapes:
             if shape.has_text_frame and shape != slide.shapes.title:
                 for paragraph in shape.text_frame.paragraphs:
                     if paragraph.text and paragraph.text.strip():
                         text_chunks.append(paragraph.text.strip())
-    return "\n".join(text_chunks).strip()
+
+    return "\n\n".join(text_chunks).strip()
 
 def extract_text_from_textfile(file_path: str) -> str:
     """Read plain text directly from file with fallback encodings."""
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Physical file not found at path: {file_path}")
+
     encodings = ["utf-8", "utf-8-sig", "latin-1", "cp1252"]
     for enc in encodings:
         try:
@@ -86,6 +125,7 @@ def extract_text_from_textfile(file_path: str) -> str:
                 return f.read().strip()
         except UnicodeDecodeError:
             continue
+
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
         return f.read().strip()
 
@@ -93,6 +133,9 @@ def extract_text_from_image(file_path: str) -> str:
     """Perform OCR extraction on image file using Pillow and pytesseract."""
     import pytesseract
     from PIL import Image
+
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Physical file not found at path: {file_path}")
 
     if not is_tesseract_available():
         error_msg = (
@@ -109,7 +152,7 @@ def extract_text_from_image(file_path: str) -> str:
 def extract_text_by_file_path(file_path: str, original_filename: str) -> str:
     """Detect file type by extension and delegate to appropriate extraction method."""
     ext = original_filename.split(".")[-1].lower() if "." in original_filename else ""
-    
+
     if ext == "pdf":
         return extract_text_from_pdf(file_path)
     elif ext in ("docx", "doc"):
@@ -121,10 +164,9 @@ def extract_text_by_file_path(file_path: str, original_filename: str) -> str:
     elif ext in ("png", "jpg", "jpeg", "webp"):
         return extract_text_from_image(file_path)
     else:
-        # Default text read fallback
         return extract_text_from_textfile(file_path)
 
-def compute_file_metadata(file_path: str, original_filename: str, extracted_text: str) -> tuple:
+def compute_file_metadata(file_path: str, original_filename: str, extracted_text: str) -> Tuple[int, int]:
     """Calculate page count and word count for document metadata."""
     word_count = len(extracted_text.split()) if extracted_text else 0
     ext = original_filename.split(".")[-1].lower() if "." in original_filename else ""
@@ -134,7 +176,7 @@ def compute_file_metadata(file_path: str, original_filename: str, extracted_text
         if ext == "pdf":
             import pymupdf
             doc = pymupdf.open(file_path)
-            page_count = len(doc)
+            page_count = max(1, len(doc))
             doc.close()
         elif ext in ("docx", "doc"):
             import docx
@@ -169,8 +211,14 @@ def process_uploaded_resource(resource_id: str, db: Optional[Session] = None) ->
         if not resource.classroom_name and resource.classroom:
             resource.classroom_name = resource.classroom.name
 
+        is_image_file = (resource.file_type or "").upper() == "IMAGE"
+        
         logger.info(f"File Uploaded | Extraction Started | resource_id={resource.id} | file_type={resource.file_type}")
         resource.extraction_status = "PROCESSING"
+        if is_image_file:
+            resource.ocr_status = "PROCESSING" if is_tesseract_available() else "UNAVAILABLE"
+        else:
+            resource.ocr_status = "NOT_APPLICABLE"
         resource.updated_at = datetime.now(timezone.utc)
         db.commit()
 
@@ -184,8 +232,22 @@ def process_uploaded_resource(resource_id: str, db: Optional[Session] = None) ->
             resource.extracted_text = extracted
             resource.page_count = page_cnt
             resource.word_count = word_cnt
+            
+            # Phase 2 — Generate vector embedding if extracted text is available
+            if extracted and extracted.strip():
+                try:
+                    from app.services.embedding_service import generate_embedding
+                    emb = generate_embedding(extracted)
+                    if emb:
+                        resource.embedding = emb
+                        logger.info(f"Vector Embedding Generated | resource_id={resource.id} | dimensions={len(emb)}")
+                except Exception as emb_err:
+                    logger.error(f"Failed to generate embedding for resource {resource.id}: {emb_err}")
+
             resource.last_processed_at = datetime.now(timezone.utc)
             resource.extraction_status = "COMPLETED"
+            if is_image_file:
+                resource.ocr_status = "COMPLETED"
             resource.extraction_error = None
             resource.updated_at = datetime.now(timezone.utc)
             db.commit()
@@ -202,6 +264,8 @@ def process_uploaded_resource(resource_id: str, db: Optional[Session] = None) ->
             page_cnt, word_cnt = compute_file_metadata(resource.file_path, resource.original_filename, "")
 
             resource.extraction_status = "FAILED"
+            if is_image_file:
+                resource.ocr_status = "UNAVAILABLE" if not is_tesseract_available() else "FAILED"
             resource.extraction_error = str(e)
             resource.page_count = resource.page_count or page_cnt
             resource.word_count = resource.word_count or word_cnt
@@ -238,8 +302,14 @@ def process_workspace_resource(resource_id: str, db: Optional[Session] = None) -
         if not workspace_res.owner_name and workspace_res.owner:
             workspace_res.owner_name = workspace_res.owner.full_name
 
+        is_image_file = (workspace_res.file_type or "").upper() == "IMAGE"
+
         logger.info(f"File Uploaded | Extraction Started | resource_id={workspace_res.id} | file_type={workspace_res.file_type}")
         workspace_res.extraction_status = "PROCESSING"
+        if is_image_file:
+            workspace_res.ocr_status = "PROCESSING" if is_tesseract_available() else "UNAVAILABLE"
+        else:
+            workspace_res.ocr_status = "NOT_APPLICABLE"
         workspace_res.updated_at = datetime.now(timezone.utc)
         db.commit()
 
@@ -253,8 +323,22 @@ def process_workspace_resource(resource_id: str, db: Optional[Session] = None) -
             workspace_res.extracted_text = extracted
             workspace_res.page_count = page_cnt
             workspace_res.word_count = word_cnt
+
+            # Phase 2 — Generate vector embedding if extracted text is available
+            if extracted and extracted.strip():
+                try:
+                    from app.services.embedding_service import generate_embedding
+                    emb = generate_embedding(extracted)
+                    if emb:
+                        workspace_res.embedding = emb
+                        logger.info(f"Vector Embedding Generated | workspace_resource_id={workspace_res.id} | dimensions={len(emb)}")
+                except Exception as emb_err:
+                    logger.error(f"Failed to generate embedding for workspace resource {workspace_res.id}: {emb_err}")
+
             workspace_res.last_processed_at = datetime.now(timezone.utc)
             workspace_res.extraction_status = "COMPLETED"
+            if is_image_file:
+                workspace_res.ocr_status = "COMPLETED"
             workspace_res.extraction_error = None
             workspace_res.updated_at = datetime.now(timezone.utc)
             db.commit()
@@ -271,6 +355,8 @@ def process_workspace_resource(resource_id: str, db: Optional[Session] = None) -
             page_cnt, word_cnt = compute_file_metadata(workspace_res.file_path, workspace_res.original_filename, "")
 
             workspace_res.extraction_status = "FAILED"
+            if is_image_file:
+                workspace_res.ocr_status = "UNAVAILABLE" if not is_tesseract_available() else "FAILED"
             workspace_res.extraction_error = str(e)
             workspace_res.page_count = workspace_res.page_count or page_cnt
             workspace_res.word_count = workspace_res.word_count or word_cnt
@@ -288,6 +374,29 @@ def process_workspace_resource(resource_id: str, db: Optional[Session] = None) -
     finally:
         if close_db_when_done:
             db.close()
+
+def reprocess_all_uploaded_resources(db: Session) -> List[Resource]:
+    """Reprocess all classroom resources in the database."""
+    resources = db.query(Resource).all()
+    processed_list = []
+    for r in resources:
+        res = process_uploaded_resource(str(r.id), db=db)
+        if res:
+            processed_list.append(res)
+    return processed_list
+
+def reprocess_all_workspace_resources(db: Session, owner_id: Optional[str] = None) -> List[WorkspaceResource]:
+    """Reprocess all workspace resources in the database."""
+    query = db.query(WorkspaceResource)
+    if owner_id:
+        query = query.filter(WorkspaceResource.owner_id == owner_id)
+    resources = query.all()
+    processed_list = []
+    for r in resources:
+        res = process_workspace_resource(str(r.id), db=db)
+        if res:
+            processed_list.append(res)
+    return processed_list
 
 def search_resources_by_text(db: Session, query: str, current_user: User) -> List[Resource]:
     """Search classroom resources by extracted text using PostgreSQL ILIKE."""

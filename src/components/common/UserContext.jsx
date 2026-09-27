@@ -623,9 +623,34 @@ export function UserProvider({ children }) {
     
     setAiChats(prev => [...prev, userMsg]);
 
-    const res = await api.sendAiMessage(text);
-    if (res.success && res.data) {
-      setAiChats(prev => [...prev, res.data]);
+    const res = await api.askAiAssistant(text);
+    if (res && res.success && res.data) {
+      const botMsg = {
+        sender: 'bot',
+        text: res.data.answer || 'No response generated.',
+        sources: res.data.sources || [],
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setAiChats(prev => [...prev, botMsg]);
+      return botMsg;
+    } else if (res && res.answer) {
+      const botMsg = {
+        sender: 'bot',
+        text: res.answer,
+        sources: res.sources || [],
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setAiChats(prev => [...prev, botMsg]);
+      return botMsg;
+    } else {
+      const errorMsg = {
+        sender: 'bot',
+        text: res?.error || 'Unable to connect to AI Assistant service.',
+        sources: [],
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setAiChats(prev => [...prev, errorMsg]);
+      return errorMsg;
     }
   }, []);
 

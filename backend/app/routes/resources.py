@@ -7,9 +7,31 @@ from app.database.session import get_db
 from app.models.user import User
 from app.auth.dependencies import get_current_user, require_faculty
 from app.services import resource_service
-from app.services.document_processor import process_uploaded_resource
+from app.services.document_processor import process_uploaded_resource, reprocess_all_uploaded_resources
 
 router = APIRouter(prefix="/resources", tags=["Resources"])
+
+@router.post("/reprocess-all")
+def reprocess_all_resources(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_faculty)
+):
+    """Trigger reprocessing for all classroom resources (Faculty only)."""
+    results = reprocess_all_uploaded_resources(db)
+    return {"reprocessed_count": len(results), "resources": [r.to_dict() for r in results]}
+
+@router.post("/{resource_id}/reprocess")
+def reprocess_single_resource(
+    resource_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_faculty)
+):
+    """Trigger reprocessing for a specific classroom resource (Faculty only)."""
+    resource = resource_service.get_resource_details(db, resource_id, current_user)
+    updated = process_uploaded_resource(str(resource.id), db=db)
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Reprocessing failed.")
+    return updated.to_dict()
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 def upload_classroom_resource(

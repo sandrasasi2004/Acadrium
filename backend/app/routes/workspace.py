@@ -7,9 +7,31 @@ from app.database.session import get_db
 from app.models.user import User
 from app.auth.dependencies import get_current_user
 from app.services import workspace_service
-from app.services.document_processor import process_workspace_resource
+from app.services.document_processor import process_workspace_resource, reprocess_all_workspace_resources
 
 router = APIRouter(prefix="/workspace", tags=["Workspace"])
+
+@router.post("/reprocess-all")
+def reprocess_all_workspace_files(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Trigger reprocessing for all workspace files belonging to current user."""
+    results = reprocess_all_workspace_resources(db, owner_id=str(current_user.id))
+    return {"reprocessed_count": len(results), "resources": [r.to_dict() for r in results]}
+
+@router.post("/{id}/reprocess")
+def reprocess_single_workspace_file(
+    id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Trigger reprocessing for a specific workspace file (Owner only)."""
+    res = workspace_service.get_workspace_file(db, id, current_user)
+    updated = process_workspace_resource(str(res.id), db=db)
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Reprocessing failed.")
+    return updated.to_dict()
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 def upload_workspace_file(
