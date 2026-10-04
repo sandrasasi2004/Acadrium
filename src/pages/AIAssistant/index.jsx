@@ -219,10 +219,6 @@ export default function AIAssistant() {
               <h2 className="text-sm font-extrabold text-slate-800">
                 {activeChat ? activeChat.title : 'Acadrium AI Assistant'}
               </h2>
-              <p className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 mt-0.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                PGVector Grounded RAG • Zero Hallucination
-              </p>
             </div>
           </div>
         </div>
@@ -418,12 +414,7 @@ export default function AIAssistant() {
           )}
         </div>
 
-        {/* Panel Footer */}
-        <div className="mt-3 border-t border-slate-100 pt-3 text-center">
-          <p className="text-[9px] text-slate-400 font-semibold">
-            Acadrium RAG Protocol • Strict Zero-Hallucination Enforced
-          </p>
-        </div>
+
 
       </div>
 

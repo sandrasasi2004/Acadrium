@@ -93,13 +93,38 @@ export default function Workspace() {
     return 'PDF';
   };
 
-  const getFileSizeString = (sizeInBytesOrFile) => {
-    if (!sizeInBytesOrFile) return '0 KB';
-    const bytes = typeof sizeInBytesOrFile === 'number' ? sizeInBytesOrFile : sizeInBytesOrFile.size || 0;
-    if (bytes > 1024 * 1024) {
-      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  const getFileSizeString = (input) => {
+    if (!input && input !== 0) return '0 KB';
+
+    if (typeof input === 'object' && input !== null) {
+      if (input.file_size !== undefined) {
+        input = input.file_size;
+      } else if (input.size !== undefined) {
+        input = input.size;
+      }
     }
-    return (bytes / 1024).toFixed(0) + ' KB';
+
+    if (typeof input === 'string') {
+      const trimmed = input.trim();
+      if (trimmed.includes('KB') || trimmed.includes('MB') || trimmed.includes('GB') || trimmed.includes('B')) {
+        return trimmed;
+      }
+      const parsed = parseFloat(trimmed);
+      if (!isNaN(parsed) && parsed > 0) {
+        input = parsed;
+      } else {
+        return '0 KB';
+      }
+    }
+
+    if (typeof input === 'number' && input > 0) {
+      if (input >= 1024 * 1024) {
+        return (input / (1024 * 1024)).toFixed(1) + ' MB';
+      }
+      return (input / 1024).toFixed(0) + ' KB';
+    }
+
+    return '0 KB';
   };
 
   const handleUploadSubmit = async (e) => {

@@ -47,6 +47,7 @@ def sync_database_columns(bind_engine):
                             has_pgvector = True
                     except Exception:
                         conn.rollback()
+                bind_engine.dialect.has_pgvector = has_pgvector
 
             if "resources" in tables:
                 columns = [c["name"] for c in inspector.get_columns("resources")]

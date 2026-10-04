@@ -38,10 +38,6 @@ export default function RightSidebar() {
           </div>
           <div>
             <h2 className="text-sm font-bold text-slate-800">Acadrium <span className="text-indigo-600 font-semibold">AI Assistant</span></h2>
-            <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              PostgreSQL RAG Connected
-            </p>
           </div>
         </div>
       </div>

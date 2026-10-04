@@ -8,6 +8,14 @@ export default function Profile() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
 
+  // Profile edit state
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editDept, setEditDept] = useState('');
+  const [editSem, setEditSem] = useState('');
+  const [editError, setEditError] = useState('');
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+
   // Password state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');

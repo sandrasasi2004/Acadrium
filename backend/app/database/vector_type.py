@@ -17,7 +17,8 @@ class VectorOrText(TypeDecorator):
         self.dim = dim
 
     def load_dialect_impl(self, dialect):
-        if dialect.name == "postgresql" and Vector is not None:
+        has_pgvector = getattr(dialect, "has_pgvector", False)
+        if dialect.name == "postgresql" and Vector is not None and has_pgvector:
             return dialect.type_descriptor(Vector(self.dim))
         else:
             return dialect.type_descriptor(TEXT())
@@ -25,7 +26,8 @@ class VectorOrText(TypeDecorator):
     def process_bind_param(self, value, dialect):
         if value is None:
             return None
-        if dialect.name == "postgresql" and Vector is not None:
+        has_pgvector = getattr(dialect, "has_pgvector", False)
+        if dialect.name == "postgresql" and Vector is not None and has_pgvector:
             return value
         else:
             if isinstance(value, (list, tuple)):
@@ -35,7 +37,8 @@ class VectorOrText(TypeDecorator):
     def process_result_value(self, value, dialect):
         if value is None:
             return None
-        if dialect.name == "postgresql" and Vector is not None:
+        has_pgvector = getattr(dialect, "has_pgvector", False)
+        if dialect.name == "postgresql" and Vector is not None and has_pgvector:
             if isinstance(value, str):
                 try:
                     return json.loads(value)

@@ -92,12 +92,38 @@ export default function ClassroomDetails() {
     return 'PDF';
   };
 
-  const getFileSizeString = (file) => {
-    if (!file) return '0 KB';
-    if (file.size > 1024 * 1024) {
-      return (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+  const getFileSizeString = (input) => {
+    if (!input && input !== 0) return '0 KB';
+
+    if (typeof input === 'object' && input !== null) {
+      if (input.file_size !== undefined) {
+        input = input.file_size;
+      } else if (input.size !== undefined) {
+        input = input.size;
+      }
     }
-    return (file.size / 1024).toFixed(0) + ' KB';
+
+    if (typeof input === 'string') {
+      const trimmed = input.trim();
+      if (trimmed.includes('KB') || trimmed.includes('MB') || trimmed.includes('GB') || trimmed.includes('B')) {
+        return trimmed;
+      }
+      const parsed = parseFloat(trimmed);
+      if (!isNaN(parsed) && parsed > 0) {
+        input = parsed;
+      } else {
+        return '0 KB';
+      }
+    }
+
+    if (typeof input === 'number' && input > 0) {
+      if (input >= 1024 * 1024) {
+        return (input / (1024 * 1024)).toFixed(1) + ' MB';
+      }
+      return (input / 1024).toFixed(0) + ' KB';
+    }
+
+    return '0 KB';
   };
 
   const [showAddAnnModal, setShowAddAnnModal] = useState(false);
@@ -405,8 +431,7 @@ export default function ClassroomDetails() {
                         const typeTag = res.file_type || res.type || 'PDF';
                         const uploader = res.uploader_name || res.uploadedBy || 'Faculty';
                         const createdDate = res.created_at ? new Date(res.created_at).toLocaleDateString() : (res.uploadedDate || 'N/A');
-                        const bytes = typeof res.file_size === 'number' ? res.file_size : null;
-                        const formattedSize = bytes ? (bytes > 1024 * 1024 ? (bytes / (1024 * 1024)).toFixed(1) + ' MB' : (bytes / 1024).toFixed(0) + ' KB') : (res.size || 'N/A');
+                        const formattedSize = getFileSizeString(res.file_size || res.size || res);
 
                         return (
                           <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
